@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
-import { Cloud, Copy, ExternalLink, Monitor, Sparkles } from 'lucide-react';
+import { CirclePlay, Cloud, Copy, Monitor, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/context/AuthContext';
@@ -86,6 +86,12 @@ const buildTtsObsUrl = (token?: string | null): string => {
     const normalizedToken = (token || '').trim();
     if (!normalizedToken) return '';
     return `${getApiBaseUrl()}/tts-obs/${normalizedToken}`;
+};
+
+const buildTtsObsDockUrl = (token?: string | null): string => {
+    const normalizedToken = (token || '').trim();
+    if (!normalizedToken) return '';
+    return `${getApiBaseUrl()}/tts/obs-dock?obs_token=${encodeURIComponent(normalizedToken)}`;
 };
 
 const ENGINE_COPY: Record<EngineType, { label: string; icon: React.ElementType }> = {
@@ -244,6 +250,7 @@ const TtsMainPage: React.FC = () => {
     const isEnabled = Boolean(status?.enabled);
     const hasLocalSetup = Boolean(status?.has_local_setup_f5 || status?.has_local_setup);
     const obsUrl = buildTtsObsUrl(obsUrlResponse?.obs_token);
+    const obsDockUrl = buildTtsObsDockUrl(obsUrlResponse?.obs_token);
 
     const gcloudVoiceOptions = useMemo(
         () =>
@@ -344,10 +351,10 @@ const TtsMainPage: React.FC = () => {
         }
     };
 
-    const handleCopyObsUrl = async (): Promise<void> => {
-        if (!obsUrl) return;
+    const handleCopyUrl = async (url: string): Promise<void> => {
+        if (!url) return;
         try {
-            await navigator.clipboard.writeText(obsUrl);
+            await navigator.clipboard.writeText(url);
             toast.success('Ссылка скопирована');
         } catch {
             toast.error('Не удалось скопировать ссылку');
@@ -373,13 +380,13 @@ const TtsMainPage: React.FC = () => {
                 </CardContent>
             </Card>
 
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.85fr)]">
-                <div className="space-y-3">
-                    <Card className="card-glass border-border/70">
+            <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.85fr)]">
+                <div className="h-full space-y-3">
+                    <Card className="card-glass flex h-full flex-col border-border/70">
                         <CardHeader className="border-b border-white/5 pb-3">
                             <CardTitle className="text-base font-bold">Озвучка</CardTitle>
                         </CardHeader>
-                        <CardContent className="h-[360px] space-y-3.5 overflow-y-auto p-4">
+                        <CardContent className="min-h-[360px] flex-1 space-y-3.5 overflow-y-auto p-4">
                             <TtsChannelPointsMode
                                 ttsMode={ttsMode}
                                 onModeChange={handleModeChange}
@@ -437,7 +444,7 @@ const TtsMainPage: React.FC = () => {
                                         <div className="flex items-center gap-2">
                                             <Input value={obsUrl || 'OBS source не создан'} readOnly className="h-9 min-w-0 font-mono text-xs" />
                                             {obsUrl ? (
-                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyObsUrl()}>
+                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsUrl)}>
                                                     <Copy className="h-4 w-4" />
                                                 </Button>
                                             ) : (
@@ -446,6 +453,14 @@ const TtsMainPage: React.FC = () => {
                                                 </Button>
                                             )}
                                         </div>
+                                        {obsDockUrl ? (
+                                            <div className="flex items-center gap-2">
+                                                <Input value={obsDockUrl} readOnly className="h-9 min-w-0 font-mono text-xs" />
+                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsDockUrl)}>
+                                                    <Copy className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        ) : null}
                                         <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
                                             <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
                                                 <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.source_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
@@ -463,10 +478,11 @@ const TtsMainPage: React.FC = () => {
                                             href="/tts/player"
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-400/60 bg-emerald-500/15 px-4 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/25"
+                                            aria-label="Открыть TTS Player"
+                                            title="Открыть TTS Player"
+                                            className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/70 bg-emerald-500/20 text-emerald-100 shadow-lg shadow-emerald-950/30 transition-colors hover:bg-emerald-500/30"
                                         >
-                                            <ExternalLink className="h-4 w-4" />
-                                            Открыть TTS Player
+                                            <CirclePlay className="h-7 w-7" />
                                         </a>
                                     </div>
                                 )}

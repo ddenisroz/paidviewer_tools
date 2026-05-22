@@ -158,6 +158,16 @@ const App: React.FC = () => {
                             </RouteErrorBoundary>
                         }
                     />
+                    <Route
+                        path="/tts/obs-dock"
+                        element={
+                            <RouteErrorBoundary routeName="TTS OBS Dock">
+                                <Suspense fallback={<MinimalFallback />}>
+                                    <TtsObsDockPage />
+                                </Suspense>
+                            </RouteErrorBoundary>
+                        }
+                    />
 
                     <Route path="/" element={<AuthGuard />}>
                         <Route path="tts-player" element={<Navigate to="/tts/player" replace />} />
@@ -167,17 +177,6 @@ const App: React.FC = () => {
                                 <RouteErrorBoundary routeName="TTS Player">
                                     <Suspense fallback={<MinimalFallback />}>
                                         <TtsPlayerPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            }
-                        />
-
-                        <Route
-                            path="tts/obs-dock"
-                            element={
-                                <RouteErrorBoundary routeName="TTS OBS Dock">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <TtsObsDockPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             }

@@ -136,6 +136,21 @@ async def _resolve_authenticated_user_id(websocket: WebSocket) -> Optional[int]:
         except Exception:
             return None
 
+    obs_token = (websocket.query_params.get("obs_token") or "").strip()
+    if obs_token:
+        client_role = (websocket.query_params.get("client_role") or "").strip().lower()
+        presence_only_raw = websocket.query_params.get("presence_only")
+        presence_only = str(presence_only_raw).strip().lower() in {"1", "true", "yes", "on"}
+        if client_role == "tts_player" and presence_only:
+            try:
+                payload = verify_jwt_token(obs_token, expected_type="obs")
+                raw_user_id = payload.get("user_id")
+                user_id = int(raw_user_id) if raw_user_id else 0
+                if user_id > 0:
+                    return user_id
+            except Exception:
+                return None
+
     session_id = websocket.cookies.get("session_id")
     if not session_id:
         return None

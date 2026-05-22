@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useLocation } from 'react-router-dom';
 
@@ -88,9 +88,38 @@ const getStoredAudioUnlocked = (): boolean => {
     return false;
 };
 
+const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
+    try {
+        const payload = token.split('.')[1];
+        if (!payload) return null;
+        const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+        return JSON.parse(window.atob(padded)) as Record<string, unknown>;
+    } catch {
+        return null;
+    }
+};
+
+const getObsDockToken = (search: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(search);
+    const token = (params.get('obs_token') || params.get('token') || '').trim();
+    return token || null;
+};
+
+const getObsDockUserId = (token: string | null): number | null => {
+    if (!token) return null;
+    const payload = decodeJwtPayload(token);
+    const rawUserId = payload?.user_id;
+    const userId = typeof rawUserId === 'number' ? rawUserId : Number(rawUserId);
+    return Number.isFinite(userId) && userId > 0 ? userId : null;
+};
+
 export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }) => {
     const location = useLocation();
     const isPlayerRoute = location.pathname === '/tts/player' || location.pathname === '/tts/obs-dock';
+    const obsDockToken = useMemo(() => getObsDockToken(location.search), [location.search]);
+    const obsDockUserId = useMemo(() => getObsDockUserId(obsDockToken), [obsDockToken]);
     const [queue, setQueue] = useState<TtsQueueItem[]>([]);
     const [currentItem, setCurrentItem] = useState<TtsQueueItem | null>(null);
     const [liveMessages, setLiveMessages] = useState<TtsLiveChatMessage[]>([]);
@@ -723,7 +752,8 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             }
         };
 
-        const shouldConnect = Boolean(isAuthenticated && user?.id && isPlayerRoute);
+        const playerUserId = user?.id || obsDockUserId;
+        const shouldConnect = Boolean(isPlayerRoute && playerUserId && (isAuthenticated || obsDockToken));
 
         presenceShouldReconnectRef.current = shouldConnect;
 
@@ -736,7 +766,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         const wsBaseUrl = WS_BASE_URL || `${protocol}//${window.location.host}`;
 
         const connectPresenceSocket = async () => {
-            if (!presenceShouldReconnectRef.current || !user?.id) {
+            if (!presenceShouldReconnectRef.current || !playerUserId) {
                 return;
             }
 
@@ -748,15 +778,17 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 return;
             }
 
-            const wsToken = await getChatWebSocketToken();
+            const wsToken = isAuthenticated ? await getChatWebSocketToken() : null;
             const params = new URLSearchParams({
                 client_role: 'tts_player',
                 presence_only: '1',
             });
             if (wsToken) {
                 params.set('ws_token', wsToken);
+            } else if (obsDockToken) {
+                params.set('obs_token', obsDockToken);
             }
-            const wsUrl = `${wsBaseUrl}/ws/chat/${user.id}?${params.toString()}`;
+            const wsUrl = `${wsBaseUrl}/ws/chat/${playerUserId}?${params.toString()}`;
             const ws = new WebSocket(wsUrl);
             presenceWebSocketRef.current = ws;
 
@@ -876,7 +908,16 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             presenceShouldReconnectRef.current = false;
             closePresenceSocket();
         };
-    }, [isAuthenticated, user?.id, isPlayerRoute, enqueueSocketAudio, addLiveChatMessage, upsertLiveMessageStatus]);
+    }, [
+        isAuthenticated,
+        user?.id,
+        obsDockToken,
+        obsDockUserId,
+        isPlayerRoute,
+        enqueueSocketAudio,
+        addLiveChatMessage,
+        upsertLiveMessageStatus,
+    ]);
 
     useEffect(() => {
         if (!isAuthenticated || listeningMode !== 'website' || !isPrimaryPlayerTab) {
