@@ -1,5 +1,7 @@
 ﻿# bot_service/core/app_config.py
 """FastAPI application configuration."""
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -77,6 +79,10 @@ def create_app(lifespan: Optional[Callable] = None) -> FastAPI:
     widgets_path = FRONTEND_ROOT / "src" / "widgets"
     if widgets_path.exists():
         app.mount("/widgets", StaticFiles(directory=str(widgets_path)), name="widgets")
+
+    uploads_path = Path("uploads").resolve()
+    uploads_path.mkdir(parents=True, exist_ok=True)
+    app.mount("/static/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
     # Audio files.
     temp_audio_dir = TEMP_DIR / "tts_audio"

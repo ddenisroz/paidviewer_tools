@@ -693,7 +693,10 @@ export const MemeAlertsRewards: React.FC = () => {
         : null;
     const selectedPlatformConnected =
         selectedRewardPlatform === 'twitch' ? !!integrations?.twitch?.enabled : !!integrations?.vk?.enabled;
-    const selectedPlatformName = selectedRewardPlatform === 'twitch' ? 'Twitch' : 'VK Live';
+    const platformAvailability = {
+        twitch: !!integrations?.twitch?.enabled,
+        vk: !!integrations?.vk?.enabled,
+    };
     const canCreateMoreRewards = configuredRewards.length < 3 || Boolean(editingRewardId);
     const donationCourseRub = getDonationCourseRub(automationSettings.donation_auto.coins_per_currency);
     const historyRows = [...history.grants].sort((a, b) => {
@@ -744,7 +747,7 @@ export const MemeAlertsRewards: React.FC = () => {
                             <MemeAlertsPlatformRewardCard
                                 platform={selectedRewardPlatform}
                                 platformConnected={selectedPlatformConnected}
-                                platformName={selectedPlatformName}
+                                platformAvailability={platformAvailability}
                                 title={rewardTitle}
                                 cost={rewardCost}
                                 coinsAmount={rewardCoinsAmount}

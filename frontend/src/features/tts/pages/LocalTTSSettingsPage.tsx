@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
-import { Download, HeartPulse, Settings2 } from 'lucide-react';
+import { CheckCircle2, CircleAlert, HeartPulse, Save, Server } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/context/AuthContext';
@@ -29,19 +29,19 @@ interface WorkerItem {
     supports_f5?: boolean;
 }
 
-const unwrapConfig = (payload: LocalTtsConfig | null | undefined): LocalTtsConfig | null => {
-    if (!payload) return null;
-    return payload;
+const unwrapStatus = (payload: unknown): TtsStatus | undefined =>
+    ((payload as { data?: TtsStatus })?.data || payload) as TtsStatus | undefined;
+
+const statusLabel = (config: LocalTtsConfig | null | undefined): string => {
+    if (config?.healthy) return 'Подключен';
+    if (config?.configured) return 'Нужна проверка';
+    return 'Не настроен';
 };
 
-const downloadJson = (filename: string, payload: unknown): void => {
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
+const workerLabel = (status?: string): string => {
+    if (status === 'online') return 'online';
+    if (status === 'busy') return 'busy';
+    return 'offline';
 };
 
 const LocalTTSSettingsPage: React.FC = () => {
@@ -49,10 +49,27 @@ const LocalTTSSettingsPage: React.FC = () => {
     const userId = user?.id;
 
     const { data: statusResponse } = useTtsStatus(null, { enabled: Boolean(userId) });
-    const { data: localConfigResponse, refetch: refetchLocalConfig } = useLocalTtsConfig('f5', { enabled: Boolean(userId) });
-    const saveConfigMutation = useSaveLocalTtsConfig();
-    const testConnectionMutation = useTestLocalTtsConnection();
-    const toggleLocalMutation = useToggleLocalTts();
+    const { data: localConfig, refetch: refetchLocalConfig } = useLocalTtsConfig('f5', { enabled: Boolean(userId) });
+    const saveConfigMutation = useSaveLocalTtsConfig({
+        onSuccess: () => {
+            toast.success('Локальный движок сохранен');
+            void refetchLocalConfig();
+        },
+    });
+    const testConnectionMutation = useTestLocalTtsConnection({
+        onSuccess: (response) => {
+            const success =
+                (response as { success?: boolean } | undefined)?.success ??
+                (response as { data?: { success?: boolean } } | undefined)?.data?.success;
+            toast[success ? 'success' : 'error'](success ? 'Подключение работает' : 'Подключение не отвечает');
+            void refetchLocalConfig();
+        },
+    });
+    const toggleLocalMutation = useToggleLocalTts({
+        onSuccess: () => {
+            void refetchLocalConfig();
+        },
+    });
 
     const { data: workers = [], refetch: refetchWorkers } = useQuery<WorkerItem[]>({
         queryKey: ['tts', 'workers', 'f5'],
@@ -65,12 +82,9 @@ const LocalTTSSettingsPage: React.FC = () => {
         },
     });
 
-    const localConfig = unwrapConfig(localConfigResponse);
-    const status = ((statusResponse as { data?: TtsStatus })?.data || statusResponse) as TtsStatus | undefined;
-
-    const [endpointUrl, setEndpointUrl] = useState<string>('http://localhost:8011');
-    const [apiKey, setApiKey] = useState<string>('');
-    const [useLocal, setUseLocal] = useState<boolean>(false);
+    const [endpointUrl, setEndpointUrl] = useState('http://localhost:8011');
+    const [apiKey, setApiKey] = useState('');
+    const [useLocal, setUseLocal] = useState(false);
 
     useEffect(() => {
         if (!localConfig) return;
@@ -78,29 +92,23 @@ const LocalTTSSettingsPage: React.FC = () => {
         setUseLocal(Boolean(localConfig.use_local));
     }, [localConfig]);
 
+    const status = unwrapStatus(statusResponse);
     const activeWorkers = useMemo(
         () => workers.filter((worker) => worker.status === 'online' || worker.status === 'busy'),
         [workers]
     );
-    const isHealthy = Boolean(localConfig?.healthy);
-    const isConfigured = Boolean(localConfig?.configured);
-    const statusLabel = isHealthy ? 'Готов' : isConfigured ? 'Нужна проверка' : 'Не настроен';
+    const configured = Boolean(localConfig?.configured || localConfig?.endpoint_url);
+    const healthy = Boolean(localConfig?.healthy);
+
+    const savePayload = (): Partial<LocalTtsConfig> => ({
+        provider: 'f5',
+        endpoint_url: endpointUrl.trim(),
+        api_key: apiKey.trim() || undefined,
+        use_local: useLocal,
+    });
 
     const handleSave = (): void => {
-        saveConfigMutation.mutate(
-            {
-                provider: 'f5',
-                endpoint_url: endpointUrl.trim(),
-                api_key: apiKey.trim() || undefined,
-                use_local: useLocal,
-            },
-            {
-                onSuccess: () => {
-                    setApiKey('');
-                    void refetchLocalConfig();
-                },
-            }
-        );
+        saveConfigMutation.mutate(savePayload());
     };
 
     const handleTest = (): void => {
@@ -110,163 +118,118 @@ const LocalTTSSettingsPage: React.FC = () => {
             api_key: apiKey.trim() || undefined,
             use_local: true,
         });
+        void refetchWorkers();
     };
 
     const handleToggleLocal = (enabled: boolean): void => {
+        if (!configured) {
+            toast.error('Сначала сохраните endpoint');
+            return;
+        }
         setUseLocal(enabled);
         toggleLocalMutation.mutate('f5', {
-            onSuccess: () => {
-                void refetchLocalConfig();
-            },
-            onError: () => {
-                setUseLocal(Boolean(localConfig?.use_local));
-            },
+            onError: () => setUseLocal(Boolean(localConfig?.use_local)),
         });
     };
 
-    const handleDownloadProvisioning = async (): Promise<void> => {
-        try {
-            const response = await ttsService.createWorkerProvisioning({ provider_hint: 'f5' });
-            const payload = response.data as {
-                download_filename?: string;
-                provisioning_bundle?: unknown;
-                data?: { download_filename?: string; provisioning_bundle?: unknown };
-            };
-            const bundle = payload.provisioning_bundle || payload.data?.provisioning_bundle;
-            const filename = payload.download_filename || payload.data?.download_filename || 'paidviewer-worker-f5.json';
-            if (!bundle) {
-                toast.error('Не удалось собрать provisioning bundle.');
-                return;
-            }
-            downloadJson(filename, bundle);
-            void refetchWorkers();
-        } catch {
-            toast.error('Не удалось скачать provisioning bundle.');
-        }
-    };
-
     return (
-        <PageWrapper contentClassName="space-y-5">
-            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-                <Card className="border-border/70 bg-card/85 shadow-sm">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <CardTitle className="text-xl">F5 Self-Host</CardTitle>
-                            </div>
-                            <Badge variant={isHealthy ? 'default' : 'secondary'}>{statusLabel}</Badge>
-                        </div>
-                    </CardHeader>
-
-                    <CardContent className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-foreground">Endpoint</label>
-                                <Input
-                                    value={endpointUrl}
-                                    onChange={(event) => setEndpointUrl(event.target.value)}
-                                    placeholder="http://localhost:8011"
-                                />
-                            </div>
-                            <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-muted/20 px-4 py-3 md:min-w-[220px]">
-                                <div>
-                                    <div className="text-sm font-medium text-foreground">Использовать self-host</div>
-                                </div>
-                                <Switch checked={useLocal} onCheckedChange={handleToggleLocal} disabled={toggleLocalMutation.isPending} />
-                            </div>
-                        </div>
-
+        <PageWrapper contentClassName="space-y-4">
+            <Card className="card-glass border-border/70">
+                <CardHeader className="border-b border-white/5 pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Server className="h-5 w-5 text-sky-300" />
+                            Локальный F5 TTS
+                        </CardTitle>
+                        <Badge variant={healthy ? 'default' : 'secondary'}>{statusLabel(localConfig)}</Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4 p-4">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.45fr)]">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-foreground">API key</label>
+                            <label className="text-sm font-bold text-foreground">Endpoint</label>
+                            <Input
+                                value={endpointUrl}
+                                onChange={(event) => setEndpointUrl(event.target.value)}
+                                placeholder="http://localhost:8011"
+                                className="h-10"
+                            />
+                        </div>
+                        <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/35 px-4 py-3">
+                            <span className="text-sm font-bold text-foreground">Использовать self-host</span>
+                            <Switch checked={useLocal} onCheckedChange={handleToggleLocal} disabled={toggleLocalMutation.isPending} />
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-foreground">API key</label>
                             <Input
                                 value={apiKey}
                                 onChange={(event) => setApiKey(event.target.value)}
-                                placeholder={localConfig?.api_key_redacted || 'Если runtime защищен ключом, укажите его здесь'}
+                                placeholder={localConfig?.api_key_redacted || 'опционально'}
+                                className="h-10"
                             />
                         </div>
+                        <Button type="button" variant="secondary" onClick={handleTest} disabled={testConnectionMutation.isPending}>
+                            <HeartPulse className="mr-2 h-4 w-4" />
+                            Проверить
+                        </Button>
+                        <Button type="button" onClick={handleSave} disabled={saveConfigMutation.isPending}>
+                            <Save className="mr-2 h-4 w-4" />
+                            Сохранить
+                        </Button>
+                    </div>
 
-                        <div className="flex flex-wrap gap-2">
-                            <Button onClick={handleTest} variant="secondary" disabled={testConnectionMutation.isPending}>
-                                <HeartPulse className="mr-2 h-4 w-4" />
-                                Проверить
-                            </Button>
-                            <Button onClick={handleSave} disabled={saveConfigMutation.isPending}>
-                                <Settings2 className="mr-2 h-4 w-4" />
-                                Сохранить
-                            </Button>
+                    <div className="grid gap-3 md:grid-cols-3">
+                        <StatusTile title="Endpoint" active={configured} value={configured ? endpointUrl : 'не задан'} />
+                        <StatusTile title="Health" active={healthy} value={healthy ? 'отвечает' : 'нет ответа'} />
+                        <StatusTile title="Режим" active={status?.f5_mode === 'local' || useLocal} value={useLocal ? 'self-host' : 'cloud'} />
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card className="card-glass border-border/70">
+                <CardHeader className="border-b border-white/5 pb-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <CardTitle className="text-base">Worker-ы</CardTitle>
+                        <Badge variant="outline">{activeWorkers.length}</Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">
+                    {workers.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-border/70 px-4 py-5 text-sm text-muted-foreground">
+                            Worker-ы не подключены
                         </div>
-
-                        <div className="grid gap-3 md:grid-cols-3">
-                            <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
-                                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Режим</div>
-                                <div className="mt-2 text-sm font-medium text-foreground">
-                                    {useLocal ? 'Self-Host активен' : 'Работает cloud'}
-                                </div>
-                            </div>
-                            <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
-                                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Health</div>
-                                <div className="mt-2 text-sm font-medium text-foreground">
-                                    {isHealthy ? 'Runtime отвечает' : 'Нужна проверка'}
-                                </div>
-                            </div>
-                            <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
-                                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Статус TTS</div>
-                                <div className="mt-2 text-sm font-medium text-foreground">
-                                    {status?.enabled ? 'Озвучка включена' : 'Озвучка выключена'}
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <div className="space-y-4">
-                    <Card className="border-border/70 bg-card/85 shadow-sm">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg">Worker Agent</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+                    ) : (
+                        workers.map((worker) => (
+                            <div key={worker.worker_key} className="rounded-lg border border-border/70 bg-background/35 px-4 py-3">
                                 <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                        <div className="text-sm font-medium text-foreground">Активные агенты</div>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-bold text-foreground">{worker.label || 'F5 Worker'}</p>
+                                        <p className="truncate text-xs text-muted-foreground">{worker.worker_key}</p>
                                     </div>
-                                    <Badge variant="outline">{activeWorkers.length}</Badge>
+                                    <Badge variant={worker.status === 'online' || worker.status === 'busy' ? 'default' : 'secondary'}>
+                                        {workerLabel(worker.status)}
+                                    </Badge>
                                 </div>
                             </div>
-
-                            <Button type="button" className="w-full" variant="secondary" onClick={() => void handleDownloadProvisioning()}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Скачать provisioning bundle
-                            </Button>
-
-                            <div className="space-y-2">
-                                {workers.length === 0 ? (
-                                    <div className="rounded-2xl border border-dashed border-border/70 bg-muted/15 px-4 py-5 text-sm text-muted-foreground">
-                                        Нет подключенных воркеров
-                                    </div>
-                                ) : (
-                                    workers.map((worker) => (
-                                        <div key={worker.worker_key} className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div>
-                                                    <div className="text-sm font-medium text-foreground">{worker.label || 'F5 Worker'}</div>
-                                                    <div className="text-xs text-muted-foreground">{worker.worker_key}</div>
-                                                </div>
-                                                <Badge variant={worker.status === 'online' || worker.status === 'busy' ? 'default' : 'secondary'}>
-                                                    {worker.status || 'offline'}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                </div>
-            </div>
+                        ))
+                    )}
+                </CardContent>
+            </Card>
         </PageWrapper>
     );
 };
+
+const StatusTile: React.FC<{ title: string; active: boolean; value: string }> = ({ title, active, value }) => (
+    <div className="rounded-lg border border-border/70 bg-background/35 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+            {active ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" /> : <CircleAlert className="h-3.5 w-3.5 text-amber-300" />}
+            {title}
+        </div>
+        <p className="truncate text-sm font-bold text-foreground">{value}</p>
+    </div>
+);
 
 export default LocalTTSSettingsPage;

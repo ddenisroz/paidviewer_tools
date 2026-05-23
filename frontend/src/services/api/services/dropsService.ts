@@ -238,4 +238,19 @@ export const dropsService = {
             },
         });
     },
+
+    async uploadWidgetSound(
+        channelName: string,
+        kind: 'spin' | 'reveal',
+        soundFile: File
+    ): Promise<AxiosResponse<ApiResponse<{ kind?: string; sound_file?: string; config?: DropsConfig }>>> {
+        const formData = new FormData();
+        formData.append('sound_file', soundFile);
+        return apiClient.post(`/api/drops/config/${channelName}/widget-sound`, formData, {
+            params: { kind },
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
 };

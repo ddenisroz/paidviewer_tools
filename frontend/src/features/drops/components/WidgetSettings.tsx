@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Copy, ExternalLink, Loader2, Monitor, Sparkles, TestTube2 } from 'lucide-react';
 
 import { DROPS_CONSTANTS } from '@/constants/drops';
@@ -9,6 +10,7 @@ import {
     useSendDropsWidgetTestEvent,
     useUpdateDropsConfig,
 } from '@/queries/drops/dropsQueries';
+import { WidgetSoundUpload } from '@/features/drops/components/WidgetSoundUpload';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
@@ -17,6 +19,8 @@ import { SliderWithInput } from '@/shared/components/ui/slider-with-input';
 import { useAutoSave } from '@/shared/hooks/useAutoSave';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { toast } from '@/utils/toastManager';
+import { dropsService } from '@/services/api/services/dropsService';
+import { queryKeys } from '@/queries/queryKeys';
 
 import type { DropsConfig } from '@/types/drops';
 
@@ -28,6 +32,7 @@ interface WidgetSettingsProps {
 interface FormData {
     widget_spinning_duration_ms: number;
     widget_result_duration_ms: number;
+    widget_sound_volume: number;
 }
 
 const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90 shadow-sm shadow-black/10';
@@ -36,7 +41,8 @@ const ACTION_CLASS = 'gap-2 border-border/70 bg-transparent text-sky-300 hover:b
 const clampDuration = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const areDurationsEqual = (left: FormData, right: FormData): boolean =>
     left.widget_spinning_duration_ms === right.widget_spinning_duration_ms &&
-    left.widget_result_duration_ms === right.widget_result_duration_ms;
+    left.widget_result_duration_ms === right.widget_result_duration_ms &&
+    left.widget_sound_volume === right.widget_sound_volume;
 
 const getWidgetFormData = (config: Partial<DropsConfig> | null | undefined): FormData => ({
     widget_spinning_duration_ms: clampDuration(
@@ -49,6 +55,7 @@ const getWidgetFormData = (config: Partial<DropsConfig> | null | undefined): For
         2000,
         DROPS_CONSTANTS.WIDGET.MAX_RESULT_MS
     ),
+    widget_sound_volume: Math.max(0, Math.min(1, Number(config?.widget_sound_volume ?? 1))),
 });
 
 const PREVIEW_QUALITIES = [
@@ -80,6 +87,22 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     const [formData, setFormData] = useState<FormData>({
         widget_spinning_duration_ms: 1500,
         widget_result_duration_ms: 5500,
+        widget_sound_volume: 1,
+    });
+    const queryClient = useQueryClient();
+    const uploadWidgetSoundMutation = useMutation({
+        mutationFn: ({ kind, file }: { kind: 'spin' | 'reveal'; file: File }) =>
+            dropsService.uploadWidgetSound(channelName, kind, file),
+        onSuccess: (response) => {
+            const payload = response.data as { success?: boolean; data?: { config?: DropsConfig } };
+            if (payload.data?.config) {
+                queryClient.setQueryData(queryKeys.drops.config(channelName), payload.data.config);
+            } else {
+                queryClient.invalidateQueries({ queryKey: queryKeys.drops.config(channelName) });
+            }
+            toast.success('Звук виджета загружен');
+        },
+        onError: () => toast.error('Не удалось загрузить звук'),
     });
 
     const configFormData = useMemo(() => getWidgetFormData(config), [config]);
@@ -114,6 +137,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
         autoSave({
             widget_spinning_duration_ms: formData.widget_spinning_duration_ms,
             widget_result_duration_ms: formData.widget_result_duration_ms,
+            widget_sound_volume: formData.widget_sound_volume,
         });
     }, [config, formData, configFormData, autoSave, clearAutoSave]);
 
@@ -134,6 +158,11 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 
     const handleDurationChange = (key: keyof FormData, value: number): void => {
         setFormData((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const handleSoundUpload = (kind: 'spin' | 'reveal', file?: File): void => {
+        if (!file) return;
+        uploadWidgetSoundMutation.mutate({ kind, file });
     };
 
     const copyWidgetUrl = () => {
@@ -201,6 +230,36 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                                     step={500}
                                     unit="мс"
                                     ariaLabel="Финальный кадр"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
+                        <WidgetSoundUpload
+                            label="Звук прокрутки"
+                            value={config?.widget_spin_sound_file}
+                            disabled={uploadWidgetSoundMutation.isPending}
+                            onFile={(file) => handleSoundUpload('spin', file)}
+                        />
+                        <WidgetSoundUpload
+                            label="Звук раскрытия"
+                            value={config?.widget_reveal_sound_file}
+                            disabled={uploadWidgetSoundMutation.isPending}
+                            onFile={(file) => handleSoundUpload('reveal', file)}
+                        />
+                        <div className="rounded-lg border border-border/70 bg-background/40 p-4">
+                            <Label className="text-sm font-medium text-foreground">Громкость</Label>
+                            <div className="mt-4">
+                                <SliderWithInput
+                                    value={Math.round(formData.widget_sound_volume * 100)}
+                                    onChange={(value) =>
+                                        handleDurationChange('widget_sound_volume', Math.max(0, Math.min(100, value)) / 100)
+                                    }
+                                    min={0}
+                                    max={100}
+                                    step={5}
+                                    unit="%"
+                                    ariaLabel="Громкость звуков виджета"
                                 />
                             </div>
                         </div>

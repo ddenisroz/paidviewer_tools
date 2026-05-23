@@ -63,9 +63,10 @@ export const MemeAlertsDonationCard: React.FC<MemeAlertsDonationCardProps> = ({
                 enabled ? 'bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20' : 'bg-card/70 hover:bg-accent'
             }`}
         >
-            {enabled ? 'Выдача за донаты включена' : 'Выдача за донаты выключена'}
+            {enabled ? 'Выдача включена' : 'Выдача выключена'}
         </Button>
         <Button
+            type="button"
             onClick={onSave}
             disabled={saving || !donationAlertsConnected}
             className="mt-auto h-9 w-full bg-blue-700 text-white hover:bg-blue-800"

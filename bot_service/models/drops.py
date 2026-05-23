@@ -92,6 +92,9 @@ class DropsConfig(Base):
     widget_opening_duration_ms = Column(Integer, default=1000)
     widget_result_duration_ms = Column(Integer, default=5500)
     widget_closing_duration_ms = Column(Integer, default=500)
+    widget_spin_sound_file = Column(String, nullable=True)
+    widget_reveal_sound_file = Column(String, nullable=True)
+    widget_sound_volume = Column(Float, default=1.0)
     widget_token = Column(String, nullable=True, unique=True, index=True)
 
     created_at = Column(DateTime, default=utcnow_naive)

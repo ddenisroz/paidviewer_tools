@@ -40,7 +40,7 @@ export const MemeAlertsGrantCard: React.FC<MemeAlertsGrantCardProps> = ({
                 className={`${FIELD_CLASS} w-full`}
             />
         </div>
-        <Button onClick={onGrant} disabled={granting} className="mt-auto h-9 w-full bg-blue-700 text-white hover:bg-blue-800">
+        <Button type="button" onClick={onGrant} disabled={granting} className="mt-auto h-9 w-full bg-blue-700 text-white hover:bg-blue-800">
             {granting ? 'Выдаю...' : 'Выдать мемкоины'}
         </Button>
     </AutomationCard>

@@ -29,6 +29,9 @@ export interface DropsConfig {
     widget_spinning_duration_ms?: number;
     widget_opening_duration_ms?: number;
     widget_result_duration_ms?: number;
+    widget_spin_sound_file?: string;
+    widget_reveal_sound_file?: string;
+    widget_sound_volume?: number;
     [key: string]: string | number | boolean | undefined;
 }
 

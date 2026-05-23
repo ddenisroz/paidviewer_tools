@@ -1,7 +1,10 @@
 """Drops configuration and widget-settings API."""
 import logging
+import os
+import time
+from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from core.database import get_db
@@ -16,7 +19,7 @@ def _build_config_response(config) -> dict:
     widget_token_val = getattr(config, 'widget_token', None)
     streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
     streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
-    return {'success': True, 'data': {'id': config.id, 'channel_name': config.channel_name, 'platform': config.platform, 'streak_days_common': config.streak_days_common, 'streak_days_rare': config.streak_days_rare, 'streak_days_epic': config.streak_days_epic, 'streak_days_legendary': config.streak_days_legendary, 'streak_messages_required': config.streak_messages_required, 'streak_reset_on_skip': streak_reset_on_skip, 'streak_enabled_twitch': streak_enabled_twitch, 'streak_enabled_vk': streak_enabled_vk, 'donation_enabled': config.donation_enabled, 'donation_amount_common': config.donation_amount_common, 'donation_amount_rare': config.donation_amount_rare, 'donation_amount_epic': config.donation_amount_epic, 'donation_amount_legendary': config.donation_amount_legendary, 'mythical_enabled': config.mythical_enabled, 'mythical_min_interval_hours': config.mythical_min_interval_hours, 'mythical_max_interval_hours': config.mythical_max_interval_hours, 'mythical_window_duration_minutes': config.mythical_window_duration_minutes, 'mythical_donation_amount': config.mythical_donation_amount, 'mythical_last_appeared': config.mythical_last_appeared, 'widget_spinning_duration_ms': config.widget_spinning_duration_ms, 'widget_opening_duration_ms': config.widget_opening_duration_ms, 'widget_result_duration_ms': config.widget_result_duration_ms, 'widget_closing_duration_ms': config.widget_closing_duration_ms, 'widget_token': widget_token_val, 'created_at': config.created_at, 'updated_at': config.updated_at}}
+    return {'success': True, 'data': {'id': config.id, 'channel_name': config.channel_name, 'platform': config.platform, 'streak_days_common': config.streak_days_common, 'streak_days_rare': config.streak_days_rare, 'streak_days_epic': config.streak_days_epic, 'streak_days_legendary': config.streak_days_legendary, 'streak_messages_required': config.streak_messages_required, 'streak_reset_on_skip': streak_reset_on_skip, 'streak_enabled_twitch': streak_enabled_twitch, 'streak_enabled_vk': streak_enabled_vk, 'donation_enabled': config.donation_enabled, 'donation_amount_common': config.donation_amount_common, 'donation_amount_rare': config.donation_amount_rare, 'donation_amount_epic': config.donation_amount_epic, 'donation_amount_legendary': config.donation_amount_legendary, 'mythical_enabled': config.mythical_enabled, 'mythical_min_interval_hours': config.mythical_min_interval_hours, 'mythical_max_interval_hours': config.mythical_max_interval_hours, 'mythical_window_duration_minutes': config.mythical_window_duration_minutes, 'mythical_donation_amount': config.mythical_donation_amount, 'mythical_last_appeared': config.mythical_last_appeared, 'widget_spinning_duration_ms': config.widget_spinning_duration_ms, 'widget_opening_duration_ms': config.widget_opening_duration_ms, 'widget_result_duration_ms': config.widget_result_duration_ms, 'widget_closing_duration_ms': config.widget_closing_duration_ms, 'widget_spin_sound_file': getattr(config, 'widget_spin_sound_file', None), 'widget_reveal_sound_file': getattr(config, 'widget_reveal_sound_file', None), 'widget_sound_volume': getattr(config, 'widget_sound_volume', 1.0), 'widget_token': widget_token_val, 'created_at': config.created_at, 'updated_at': config.updated_at}}
 
 class DropsConfigCreate(BaseModel):
     """Base payload for creating a drops configuration."""
@@ -64,6 +67,9 @@ class DropsConfigUpdate(BaseModel):
     widget_opening_duration_ms: Optional[int] = Field(None, ge=500, le=3000)
     widget_result_duration_ms: Optional[int] = Field(None, ge=2000, le=15000)
     widget_closing_duration_ms: Optional[int] = Field(None, ge=200, le=2000)
+    widget_spin_sound_file: Optional[str] = Field(None, max_length=500)
+    widget_reveal_sound_file: Optional[str] = Field(None, max_length=500)
+    widget_sound_volume: Optional[float] = Field(None, ge=0, le=1)
 
 def get_user_id(current_user: dict) -> int:
     """Extract the current user ID from the auth payload."""
@@ -157,13 +163,85 @@ async def update_drops_config(channel_name: str, config_data: DropsConfigUpdate,
         except Exception as ws_error:
             logger.warning(f'Failed to send WebSocket notification for drops config: {ws_error}')
         invalidate_cache(f'drops_config:{user_id}:{channel_name}:')
-        streak_reset_on_skip = getattr(config, 'streak_reset_on_skip', True)
-        widget_token = getattr(config, 'widget_token', None)
-        streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
-        streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
-        return {'success': True, 'message': 'Drops configuration updated.', 'data': {'id': config.id, 'channel_name': config.channel_name, 'platform': config.platform, 'streak_days_common': config.streak_days_common, 'streak_days_rare': config.streak_days_rare, 'streak_days_epic': config.streak_days_epic, 'streak_days_legendary': config.streak_days_legendary, 'streak_messages_required': config.streak_messages_required, 'streak_reset_on_skip': streak_reset_on_skip, 'streak_enabled_twitch': streak_enabled_twitch, 'streak_enabled_vk': streak_enabled_vk, 'donation_enabled': config.donation_enabled, 'donation_amount_common': config.donation_amount_common, 'donation_amount_rare': config.donation_amount_rare, 'donation_amount_epic': config.donation_amount_epic, 'donation_amount_legendary': config.donation_amount_legendary, 'mythical_enabled': config.mythical_enabled, 'mythical_min_interval_hours': config.mythical_min_interval_hours, 'mythical_max_interval_hours': config.mythical_max_interval_hours, 'mythical_window_duration_minutes': config.mythical_window_duration_minutes, 'mythical_donation_amount': config.mythical_donation_amount, 'mythical_last_appeared': config.mythical_last_appeared, 'widget_spinning_duration_ms': config.widget_spinning_duration_ms, 'widget_opening_duration_ms': config.widget_opening_duration_ms, 'widget_result_duration_ms': config.widget_result_duration_ms, 'widget_closing_duration_ms': config.widget_closing_duration_ms, 'widget_token': widget_token, 'created_at': config.created_at, 'updated_at': config.updated_at}}
+        response = _build_config_response(config)
+        response['message'] = 'Drops configuration updated.'
+        return response
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error updating drops config')
+        raise HTTPException(status_code=500, detail='Internal server error.')
+
+
+@router.post('/config/{channel_name}/widget-sound')
+async def upload_drops_widget_sound(
+    channel_name: str,
+    kind: str,
+    sound_file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """Upload spin/reveal sounds for the OBS drops widget."""
+    try:
+        if not current_user:
+            raise HTTPException(status_code=401, detail='Authentication required.')
+        user_id = get_user_id(current_user)
+        if not user_id:
+            raise HTTPException(status_code=401, detail='Authentication required.')
+
+        normalized_kind = (kind or '').strip().lower()
+        if normalized_kind not in {'spin', 'reveal'}:
+            raise HTTPException(status_code=400, detail='kind must be spin or reveal.')
+
+        from validators.file_validators import validate_sound_file
+        from services.drops.drops_service import DropsService
+
+        validate_sound_file(sound_file)
+        drops_service = DropsService(db)
+        config = drops_service.get_user_config(user_id=user_id, channel_name=channel_name, platform=None)
+        if not config:
+            config = drops_service.create_or_update_user_config(
+                user_id=user_id,
+                channel_name=channel_name,
+                platform=None,
+                config_data={},
+            )
+
+        upload_dir = f"uploads/sounds/{user_id}/drops-widget"
+        os.makedirs(upload_dir, exist_ok=True)
+        safe_source_name = Path(sound_file.filename or '').name
+        file_extension = Path(safe_source_name).suffix.lower() or '.wav'
+        filename = f"widget_{normalized_kind}_{int(time.time())}{file_extension}"
+        file_path = os.path.join(upload_dir, filename)
+
+        with open(file_path, 'wb') as buffer:
+            content = await sound_file.read()
+            if len(content) > 10 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail='Sound file is too large.')
+            buffer.write(content)
+
+        public_path = f"/static/uploads/sounds/{user_id}/drops-widget/{filename}"
+        update_data = {
+            'widget_spin_sound_file' if normalized_kind == 'spin' else 'widget_reveal_sound_file': public_path,
+        }
+        config = drops_service.create_or_update_user_config(
+            user_id=user_id,
+            channel_name=channel_name,
+            platform=None,
+            config_data=update_data,
+        )
+        invalidate_cache(f'drops_config:{user_id}:{channel_name}:')
+        return {
+            'success': True,
+            'message': 'Widget sound uploaded.',
+            'data': {
+                'kind': normalized_kind,
+                'sound_file': public_path,
+                'config': _build_config_response(config).get('data'),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception('Error uploading drops widget sound')
         raise HTTPException(status_code=500, detail='Internal server error.')

@@ -22,6 +22,23 @@ const getBrowserOrigin = (): string => {
     return trimTrailingSlashes(window.location.origin);
 };
 
+export const getFrontendBaseUrl = (): string => {
+    const configuredUrl = getConfiguredEnvUrl(
+        import.meta.env.VITE_FRONTEND_URL as string | undefined,
+        import.meta.env.VITE_APP_URL as string | undefined
+    );
+    if (configuredUrl) {
+        return configuredUrl;
+    }
+
+    const browserOrigin = getBrowserOrigin();
+    if (browserOrigin) {
+        return browserOrigin;
+    }
+
+    throw new Error('Unable to resolve frontend base URL from window.location.origin');
+};
+
 export const getApiBaseUrl = (): string => {
     const configuredUrl = getConfiguredEnvUrl(
         import.meta.env.VITE_BOT_SERVICE_URL as string | undefined,

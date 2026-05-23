@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import ColorInput from '@/features/chatbox/components/ColorInputPickerOnly';
 import PreviewPanel from '@/features/chatbox/components/PreviewPanel';
 import { CHATBOX_BRAND_FONT, CHATBOX_FONT_OPTIONS } from '@/features/chatbox/constants/fontOptions';
+import { CHATBOX_PREVIEW_MESSAGES } from '@/features/chatbox/constants/previewMessages';
 import {
     extractSettingsFromResponse,
     loadGoogleFont,
@@ -25,7 +26,6 @@ import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/shared/utils/toastManager';
 
 import type { ApiResponse } from '@/types/api';
-import type { ChatEmote } from '@/types/chat';
 import type { ChatBoxSettings } from '@/types/chatbox';
 import type { AxiosResponse } from 'axios';
 
@@ -33,19 +33,6 @@ interface ChatBoxSettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave?: (settings: ChatBoxSettings) => void;
-}
-
-interface PreviewMessage {
-    id: number;
-    platform: 'twitch' | 'vk';
-    author: string;
-    message: string;
-    time: string;
-    role: string;
-    badges: string[];
-    emotes?: ChatEmote[];
-    vk_role_icon_url?: string;
-    avatar_url?: string;
 }
 
 const DEFAULT_SETTINGS: ChatBoxSettings = {
@@ -76,100 +63,6 @@ const DEFAULT_SETTINGS: ChatBoxSettings = {
     widget_url: '',
     version: 1,
 };
-
-const PREVIEW_MESSAGES: PreviewMessage[] = [
-    {
-        id: 1,
-        platform: 'twitch',
-        author: 'dimplik',
-        message: 'Доброе утро Em',
-        time: '12:00',
-        role: 'Viewer',
-        badges: [],
-        avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=D',
-    },
-    {
-        id: 2,
-        platform: 'twitch',
-        author: 'podarok',
-        message: 'аравудус подрубил Kappa',
-        time: '12:01',
-        role: 'VIP',
-        badges: ['vip/1'],
-        emotes: [
-            {
-                id: '25',
-                name: 'Kappa',
-                url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0',
-                start: 18,
-                end: 22,
-            },
-        ],
-        avatar_url: 'https://placehold.co/40x40/4f46e5/FFFFFF?text=P',
-    },
-    {
-        id: 3,
-        platform: 'twitch',
-        author: 'arolkish',
-        message: 'Ребят, что выиграло на ауке? https://example.com',
-        time: '12:02',
-        role: 'Moderator',
-        badges: ['moderator/1'],
-        avatar_url: 'https://placehold.co/40x40/22c55e/FFFFFF?text=A',
-    },
-    {
-        id: 4,
-        platform: 'vk',
-        author: 'Дмитрий Хохлов',
-        message: 'когда уже игры будут? :lasqaJoyge:',
-        time: '12:03',
-        role: '',
-        badges: [
-            'https://images.live.vkvideo.ru/badge/69b9405b-81ae-40b4-abdb-2d47cff10637/icon/size/large?change_time=1733399731',
-        ],
-        emotes: [
-            {
-                id: 'e46b4fbd-901a-4f62-8924-da9eb4f094f8',
-                name: 'lasqaJoyge',
-                url: 'https://images.live.vkvideo.ru/smile/e46b4fbd-901a-4f62-8924-da9eb4f094f8/icon/size/large?change_time=1759944303',
-                start: 0,
-                end: 0,
-            },
-        ],
-        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=DK',
-    },
-    {
-        id: 5,
-        platform: 'vk',
-        author: 'Zavtra_Zavod',
-        message: 'Доброе утро :lasqaPoPivu:',
-        time: '12:04',
-        role: '',
-        badges: [
-            'https://images.live.vkvideo.ru/badge/69b9405b-81ae-40b4-abdb-2d47cff10637/icon/size/large?change_time=1733399731',
-        ],
-        emotes: [
-            {
-                id: 'e46b4fbd-901a-4f62-8924-da9eb4f094f8',
-                name: 'lasqaPoPivu',
-                url: 'https://images.live.vkvideo.ru/smile/e46b4fbd-901a-4f62-8924-da9eb4f094f8/icon/size/large?change_time=1759944303',
-                start: 0,
-                end: 0,
-            },
-        ],
-        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=ZZ',
-    },
-    {
-        id: 6,
-        platform: 'twitch',
-        author: 'Posobachii',
-        message: 'аравудус подрубил JustAnotherDay',
-        time: '12:05',
-        role: 'Viewer',
-        badges: [],
-        avatar_url: 'https://placehold.co/40x40/475569/FFFFFF?text=P',
-    },
-];
 
 const SETTINGS_SECTION_CLASS = 'rounded-lg border border-border/60 bg-card/60 p-3.5 space-y-3.5';
 const SETTINGS_SECTION_TITLE_CLASS = 'text-[11px] uppercase tracking-wider text-muted-foreground';
@@ -407,12 +300,12 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                         >
                             <div
                                 className={`border border-border/60 rounded-lg overflow-hidden bg-card/60 ${
-                                    isHorizontalPreview ? 'h-[220px] min-h-[180px] flex-none' : 'flex-1 min-h-[240px]'
+                                    isHorizontalPreview ? 'h-[380px] min-h-[320px] flex-none' : 'flex-1 min-h-[240px]'
                                 }`}
                             >
                                 <PreviewPanel
                                     settings={settings}
-                                    previewMessages={PREVIEW_MESSAGES}
+                                    previewMessages={CHATBOX_PREVIEW_MESSAGES}
                                     twitchChannelName={
                                         (user?.integrations?.twitch as { channel_name?: string })?.channel_name ||
                                         user?.twitch_username ||

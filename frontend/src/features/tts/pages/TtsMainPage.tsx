@@ -36,7 +36,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
-import { getApiBaseUrl } from '@/shared/utils/urlUtils';
+import { getApiBaseUrl, getFrontendBaseUrl } from '@/shared/utils/urlUtils';
 
 import type { ApiResponse } from '@/types';
 import type { TtsSettings, TtsStatus } from '@/types/tts';
@@ -91,7 +91,7 @@ const buildTtsObsUrl = (token?: string | null): string => {
 const buildTtsObsDockUrl = (token?: string | null): string => {
     const normalizedToken = (token || '').trim();
     if (!normalizedToken) return '';
-    return `${getApiBaseUrl()}/tts/obs-dock?obs_token=${encodeURIComponent(normalizedToken)}`;
+    return `${getFrontendBaseUrl()}/tts/obs-dock?obs_token=${encodeURIComponent(normalizedToken)}`;
 };
 
 const ENGINE_COPY: Record<EngineType, { label: string; icon: React.ElementType }> = {
@@ -380,13 +380,13 @@ const TtsMainPage: React.FC = () => {
                 </CardContent>
             </Card>
 
-            <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.85fr)]">
+            <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(360px,0.82fr)_minmax(520px,1fr)]">
                 <div className="h-full space-y-3">
-                    <Card className="card-glass flex h-full flex-col border-border/70">
+                    <Card className="card-glass flex h-full min-h-[420px] flex-col border-border/70 xl:max-w-[660px]">
                         <CardHeader className="border-b border-white/5 pb-3">
                             <CardTitle className="text-base font-bold">Озвучка</CardTitle>
                         </CardHeader>
-                        <CardContent className="min-h-[360px] flex-1 space-y-3.5 overflow-y-auto p-4">
+                        <CardContent className="flex flex-1 flex-col space-y-3.5 overflow-y-auto p-4">
                             <TtsChannelPointsMode
                                 ttsMode={ttsMode}
                                 onModeChange={handleModeChange}
@@ -438,7 +438,7 @@ const TtsMainPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="min-h-[96px]">
+                            <div className="flex min-h-[150px] flex-1">
                                 {listeningMode === 'obs' ? (
                                     <div className="space-y-3 rounded-lg border border-border/70 bg-background/35 p-3">
                                         <div className="flex items-center gap-2">
@@ -473,17 +473,23 @@ const TtsMainPage: React.FC = () => {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="flex h-full items-center justify-center">
+                                    <div className="flex h-full w-full items-center justify-center">
+                                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                                            <div className="justify-self-end text-right font-brand text-lg font-bold leading-tight text-emerald-100">
+                                                Начать слушать чат
+                                            </div>
                                         <a
                                             href="/tts/player"
                                             target="_blank"
                                             rel="noreferrer"
                                             aria-label="Открыть TTS Player"
                                             title="Открыть TTS Player"
-                                            className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/70 bg-emerald-500/20 text-emerald-100 shadow-lg shadow-emerald-950/30 transition-colors hover:bg-emerald-500/30"
+                                            className="inline-flex h-16 w-16 items-center justify-center rounded-full border border-emerald-400/70 bg-emerald-500/20 text-emerald-100 shadow-lg shadow-emerald-950/30 transition-colors hover:bg-emerald-500/30"
                                         >
-                                            <CirclePlay className="h-7 w-7" />
+                                            <CirclePlay className="h-8 w-8" />
                                         </a>
+                                            <span aria-hidden="true" />
+                                        </div>
                                     </div>
                                 )}
                             </div>

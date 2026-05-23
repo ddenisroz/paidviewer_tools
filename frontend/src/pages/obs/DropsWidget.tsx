@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 
 import { dropsService } from '@/services/api/services/dropsService';
 import { logger } from '@/shared/utils/prodLogger';
-import { getDropsWidgetWebSocketUrl } from '@/shared/utils/urlUtils';
+import { getDropsWidgetWebSocketUrl, resolveAudioUrl } from '@/shared/utils/urlUtils';
 
 import {
     DropsWidgetOpeningStage,
@@ -12,7 +12,6 @@ import {
     DropsWidgetPreviewPanel,
     DropsWidgetReelStage,
     DropsWidgetResultPanel,
-    qualityGlowClass,
     qualityLabel,
 } from './dropsWidgetVisuals';
 
@@ -67,6 +66,9 @@ interface WidgetConfigData {
     widget_spinning_duration_ms?: number;
     widget_opening_duration_ms?: number;
     widget_result_duration_ms?: number;
+    widget_spin_sound_file?: string | null;
+    widget_reveal_sound_file?: string | null;
+    widget_sound_volume?: number;
 }
 
 interface DropsApiResponse<T = unknown> {
@@ -86,6 +88,9 @@ interface WidgetConfig {
     spinning_duration: number;
     opening_duration: number;
     result_duration: number;
+    spin_sound_file?: string | null;
+    reveal_sound_file?: string | null;
+    sound_volume: number;
 }
 
 const CARD_WIDTH = 188;
@@ -125,6 +130,9 @@ const DropsWidget: React.FC = () => {
         spinning_duration: 1800,
         opening_duration: 700,
         result_duration: 5000,
+        spin_sound_file: null,
+        reveal_sound_file: null,
+        sound_volume: 1,
     });
     const channelNameRef = useRef<string | null>(null);
     const platformRef = useRef<string | null>(null);
@@ -182,9 +190,17 @@ const DropsWidget: React.FC = () => {
 
     const playRewardSound = useCallback((rewardData: RewardData): void => {
         if (!rewardData.sound_file) return;
-        const audio = new Audio(rewardData.sound_file);
+        const audio = new Audio(resolveAudioUrl(rewardData.sound_file));
         audio.volume = clamp(rewardData.sound_volume ?? 1, 0, 1);
         audio.play().catch((error) => logger.error('Error playing reward sound:', error));
+    }, []);
+
+    const playWidgetSound = useCallback((kind: 'spin' | 'reveal'): void => {
+        const source = kind === 'spin' ? widgetConfig.current.spin_sound_file : widgetConfig.current.reveal_sound_file;
+        if (!source) return;
+        const audio = new Audio(resolveAudioUrl(source));
+        audio.volume = clamp(widgetConfig.current.sound_volume ?? 1, 0, 1);
+        audio.play().catch((error) => logger.debug('Drops widget sound skipped:', error));
     }, []);
 
     const loadRewardsForQuality = useCallback(
@@ -330,6 +346,7 @@ const DropsWidget: React.FC = () => {
                     if (slotIndex !== lastTickSlotRef.current) {
                         lastTickSlotRef.current = slotIndex;
                         setPointerKick(true);
+                        playWidgetSound('spin');
                         window.setTimeout(() => setPointerKick(false), 70);
                     }
 
@@ -342,6 +359,7 @@ const DropsWidget: React.FC = () => {
 
                     setTranslateX(`translate3d(calc(50% - ${targetOffset + CARD_WIDTH / 2}px), 0, 0)`);
                     setPhase('result');
+                    playWidgetSound('reveal');
                     playRewardSound(resolvedRewardData);
                 };
 
@@ -358,7 +376,7 @@ const DropsWidget: React.FC = () => {
 
             animationTimeoutsRef.current = [openingTimeout, finishTimeout];
         },
-        [clearAnimations, loadRewardsForQuality, playRewardSound]
+        [clearAnimations, loadRewardsForQuality, playRewardSound, playWidgetSound]
     );
 
     const triggerPreviewChest = useCallback(
@@ -410,6 +428,9 @@ const DropsWidget: React.FC = () => {
                         spinning_duration: configData.data.widget_spinning_duration_ms || 1800,
                         opening_duration: configData.data.widget_opening_duration_ms || 700,
                         result_duration: configData.data.widget_result_duration_ms || 5000,
+                        spin_sound_file: configData.data.widget_spin_sound_file || null,
+                        reveal_sound_file: configData.data.widget_reveal_sound_file || null,
+                        sound_volume: clamp(configData.data.widget_sound_volume ?? 1, 0, 1),
                     };
                 }
             } catch (error) {
@@ -566,30 +587,35 @@ const DropsWidget: React.FC = () => {
 
     return (
         <div className={`fixed inset-0 overflow-hidden ${idleBackground}`}>
-            <div className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${qualityGlowClass(currentQuality)}`} />
+            <style>
+                {`
+                    @keyframes dropsPointerTick {
+                        0%, 100% { transform: translateX(-50%) rotate(0deg); }
+                        35% { transform: translateX(-50%) rotate(11deg); }
+                        70% { transform: translateX(-50%) rotate(-7deg); }
+                    }
+                `}
+            </style>
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
-                <div className="relative mx-auto w-full max-w-[1260px] px-8">
+                <div className="relative mx-auto w-full max-w-[1120px] px-8">
                     <div
-                        className={`pointer-events-none absolute left-1/2 top-[-30px] z-30 h-0 w-0 -translate-x-1/2 border-l-[18px] border-r-[18px] border-t-[24px] border-l-transparent border-r-transparent border-t-amber-300 drop-shadow-[0_6px_14px_rgba(251,191,36,0.55)] transition-transform duration-75 ${
-                            pointerKick ? 'rotate-[8deg]' : 'rotate-0'
+                        className={`pointer-events-none absolute left-1/2 top-[86px] z-40 h-0 w-0 -translate-x-1/2 border-l-[18px] border-r-[18px] border-t-[26px] border-l-transparent border-r-transparent border-t-amber-300 drop-shadow-[0_8px_16px_rgba(251,191,36,0.62)] ${
+                            pointerKick ? '[animation:dropsPointerTick_120ms_ease-out]' : ''
                         }`}
                     />
-                    <div className="pointer-events-none absolute left-1/2 top-[-6px] z-20 h-[280px] w-[3px] -translate-x-1/2 bg-gradient-to-b from-amber-200 via-amber-300 to-transparent opacity-75" />
+                    <div className="pointer-events-none absolute left-1/2 top-[110px] z-30 h-[210px] w-[3px] -translate-x-1/2 bg-gradient-to-b from-amber-200 via-amber-300 to-transparent opacity-80" />
 
-                    <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#08101acf] px-5 py-8 shadow-[0_30px_120px_rgba(0,0,0,0.45)] backdrop-blur-md">
-                        <div className="absolute inset-y-0 left-1/2 z-10 w-[236px] -translate-x-1/2 border-x border-amber-300/20 bg-amber-200/[0.03]" />
-                        {phase === 'opening' ? (
-                            <DropsWidgetOpeningStage quality={currentQuality} viewerName={currentReward.viewer_name} />
-                        ) : (
-                            <DropsWidgetReelStage
-                                phase={phase}
-                                quality={currentQuality}
-                                reelItems={reelItems}
-                                translateX={translateX}
-                                winnerSlotIndex={WINNER_SLOT_INDEX}
-                            />
-                        )}
-                    </div>
+                    {phase === 'opening' ? (
+                        <DropsWidgetOpeningStage quality={currentQuality} viewerName={currentReward.viewer_name} />
+                    ) : (
+                        <DropsWidgetReelStage
+                            phase={phase}
+                            quality={currentQuality}
+                            reelItems={reelItems}
+                            translateX={translateX}
+                            winnerSlotIndex={WINNER_SLOT_INDEX}
+                        />
+                    )}
 
                     {phase === 'result' ? <DropsWidgetResultPanel reward={currentReward} quality={currentQuality} /> : null}
                 </div>
