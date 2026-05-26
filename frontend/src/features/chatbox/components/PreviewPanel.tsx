@@ -71,20 +71,20 @@ interface EmoteData {
 
 const PREVIEW_7TV_FALLBACKS: EmoteData[] = [
     {
-        id: 'preview-7tv-justanotherday',
-        name: 'JustAnotherDay',
+        id: 'preview-7tv-hype',
+        name: 'HYPE',
         url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
         animated: false,
     },
     {
-        id: 'preview-7tv-em',
-        name: 'Em',
+        id: 'preview-7tv-obsent',
+        name: 'Obsent',
         url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
         animated: false,
     },
     {
-        id: 'preview-7tv-based',
-        name: 'Based',
+        id: 'preview-7tv-imnotcrying',
+        name: 'imNOTcrying',
         url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
         animated: false,
     },
@@ -147,6 +147,11 @@ const toRenderedPreviewMessage = (message: PreviewMessage): RenderedPreviewMessa
     preview_key: `${message.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
 });
 
+const buildPreviewSequence = (messages: PreviewMessage[], limit: number): RenderedPreviewMessage[] => {
+    if (messages.length === 0 || limit <= 0) return [];
+    return Array.from({ length: limit }, (_, index) => toRenderedPreviewMessage(messages[index % messages.length]));
+};
+
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, twitchChannelName }) => {
     const [, setBadgesReady] = useState(false);
     const [globalEmotes, setGlobalEmotes] = useState<Map<string, EmoteData>>(new Map());
@@ -170,10 +175,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
     }, [settings.font_family]);
     const previewLimit = useMemo(() => {
         if (isHorizontal) return Math.max(1, settings.max_messages);
-        const estimatedLineHeight = settings.font_size * 1.35 + 8 + settings.message_spacing;
-        const fitByHeight = Math.max(3, Math.floor(300 / Math.max(estimatedLineHeight, 18)));
-        return Math.max(1, Math.min(settings.max_messages, fitByHeight));
-    }, [isHorizontal, settings.font_size, settings.max_messages, settings.message_spacing]);
+        return Math.max(12, Math.min(Math.max(settings.max_messages, 18), 32));
+    }, [isHorizontal, settings.max_messages]);
 
     const hexToRgba = (hex: string, opacity: number): string => {
         const r = parseInt(hex.slice(1, 3), 16);
@@ -322,9 +325,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
 
     useEffect(() => {
         const limit = previewLimit;
-        setSimulatedMessages(previewMessages.slice(-limit).map(toRenderedPreviewMessage));
+        setSimulatedMessages(buildPreviewSequence(previewMessages, limit));
         setLastAnimatedMessageKey(null);
-        nextTemplateIndexRef.current = 0;
+        nextTemplateIndexRef.current = previewMessages.length === 0 ? 0 : limit % previewMessages.length;
     }, [previewMessages, previewLimit]);
 
     useEffect(() => {
@@ -352,7 +355,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
     }, [previewMessages, effectiveAnimationType, settings.animation_duration, previewLimit]);
 
     return (
-        <div className="h-full flex flex-col">
+        <div className="flex h-full min-h-0 flex-col">
             <style>
                 {`
                     @keyframes previewFade {
@@ -390,7 +393,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                 `}
             </style>
             <div
-                className="chatbox-preview-font-scope flex-1 overflow-hidden border border-white/10 rounded-md"
+                className="chatbox-preview-font-scope min-h-0 flex-1 overflow-hidden rounded-md border border-white/10"
                 style={{
                     ['--chatbox-preview-font' as string]: resolvedFontFamily,
                     background: panelBackground,
@@ -400,7 +403,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                 }}
             >
                 <div
-                    className="h-full p-4"
+                    className="h-full min-h-0 p-4"
                     style={{
                         display: 'flex',
                         alignItems: isHorizontal ? 'center' : 'stretch',
@@ -428,7 +431,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                 width: isHorizontal ? 'max-content' : '100%',
                             }}
                         >
-                            {!isHorizontal && <div style={{ flexGrow: 1 }} />}
                             {simulatedMessages.map((msg) => {
                                 const animationName = getAnimationName(effectiveAnimationType);
                                 const shouldAnimate =

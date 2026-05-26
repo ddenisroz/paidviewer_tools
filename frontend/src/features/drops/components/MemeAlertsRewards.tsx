@@ -733,9 +733,9 @@ export const MemeAlertsRewards: React.FC = () => {
                     onConnect={handleConnect}
                 />
             ) : (
-                <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-                    <div className="space-y-4">
-                        <div className="grid gap-3 lg:grid-cols-3">
+                <div className="grid grid-cols-[minmax(0,1fr)_clamp(260px,27vw,360px)] items-start gap-3">
+                    <div className="min-w-0 space-y-4">
+                        <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] items-stretch gap-2.5">
                             <MemeAlertsGrantCard
                                 grantTarget={grantTarget}
                                 grantValue={grantValue}

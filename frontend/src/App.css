@@ -5,6 +5,56 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Dashboard responsive contract:
+ * tight < 960px, compact 960-1279px, wide >= 1280px.
+ * New dashboard surfaces should preserve their desktop composition across
+ * these three tiers instead of adding extra sm/md/lg/xl structural jumps.
+ */
+@layer utilities {
+    .pv-dashboard-layout {
+        --pv-sidebar-width: 56px;
+        --pv-dashboard-padding: 0.75rem;
+        --pv-dashboard-gap: 0.75rem;
+        --pv-page-padding-x: 1rem;
+        --pv-page-padding-y: 1rem;
+        display: grid;
+        grid-template-columns: var(--pv-sidebar-width) minmax(0, 1fr);
+    }
+
+    @media (min-width: 960px) {
+        .pv-dashboard-layout {
+            --pv-sidebar-width: 64px;
+            --pv-dashboard-padding: 1rem;
+            --pv-dashboard-gap: 1rem;
+            --pv-page-padding-x: 1.25rem;
+        }
+    }
+
+    @media (min-width: 1280px) {
+        .pv-dashboard-layout {
+            --pv-sidebar-width: 304px;
+            --pv-dashboard-padding: 1.5rem;
+            --pv-dashboard-gap: 1.5rem;
+            --pv-page-padding-x: 1.5rem;
+            --pv-page-padding-y: 1rem;
+        }
+    }
+
+    .pv-dashboard-sidebar {
+        width: var(--pv-sidebar-width);
+    }
+
+    .pv-dashboard-main {
+        gap: var(--pv-dashboard-gap);
+        padding: var(--pv-dashboard-padding);
+    }
+
+    .pv-page-shell {
+        padding: var(--pv-page-padding-y) var(--pv-page-padding-x);
+    }
+}
+
 /* Spacing Utility Classes - Use these for consistent spacing */
 @layer utilities {
     /* Card spacing utilities */

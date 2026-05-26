@@ -145,7 +145,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4 p-4">
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.45fr)]">
+                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(200px,0.45fr)] gap-3 min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(220px,0.45fr)]">
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-foreground">Endpoint</label>
                             <Input
@@ -161,7 +161,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-3">
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-foreground">API key</label>
                             <Input
@@ -181,7 +181,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         </Button>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-3">
+                    <div className="grid grid-cols-3 gap-3">
                         <StatusTile title="Endpoint" active={configured} value={configured ? endpointUrl : 'не задан'} />
                         <StatusTile title="Health" active={healthy} value={healthy ? 'отвечает' : 'нет ответа'} />
                         <StatusTile title="Режим" active={status?.f5_mode === 'local' || useLocal} value={useLocal ? 'self-host' : 'cloud'} />
@@ -192,14 +192,14 @@ const LocalTTSSettingsPage: React.FC = () => {
             <Card className="card-glass border-border/70">
                 <CardHeader className="border-b border-white/5 pb-3">
                     <div className="flex items-center justify-between gap-3">
-                        <CardTitle className="text-base">Worker-ы</CardTitle>
+                        <CardTitle className="text-base">Workers</CardTitle>
                         <Badge variant="outline">{activeWorkers.length}</Badge>
                     </div>
                 </CardHeader>
-                <CardContent className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">
+                <CardContent className="grid grid-cols-3 gap-2 p-4">
                     {workers.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-border/70 px-4 py-5 text-sm text-muted-foreground">
-                            Worker-ы не подключены
+                        <div className="col-span-3 rounded-lg border border-dashed border-border/70 px-4 py-5 text-sm text-muted-foreground">
+                            Workers не подключены
                         </div>
                     ) : (
                         workers.map((worker) => (

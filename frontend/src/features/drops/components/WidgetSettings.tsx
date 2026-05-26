@@ -193,8 +193,8 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-lg border border-border/70 bg-background/40 p-4">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-lg border border-border/70 bg-background/40 p-3">
                             <Label className="text-sm font-medium text-foreground">Скорость прокрутки</Label>
                             <div className="mt-4">
                                 <SliderWithInput
@@ -214,7 +214,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                             </div>
                         </div>
 
-                        <div className="rounded-lg border border-border/70 bg-background/40 p-4">
+                        <div className="rounded-lg border border-border/70 bg-background/40 p-3">
                             <Label className="text-sm font-medium text-foreground">Финальный кадр</Label>
                             <div className="mt-4">
                                 <SliderWithInput
@@ -234,7 +234,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                             </div>
                         </div>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
+                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_200px] gap-3">
                         <WidgetSoundUpload
                             label="Звук прокрутки"
                             value={config?.widget_spin_sound_file}
@@ -247,7 +247,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                             disabled={uploadWidgetSoundMutation.isPending}
                             onFile={(file) => handleSoundUpload('reveal', file)}
                         />
-                        <div className="rounded-lg border border-border/70 bg-background/40 p-4">
+                        <div className="rounded-lg border border-border/70 bg-background/40 p-3">
                             <Label className="text-sm font-medium text-foreground">Громкость</Label>
                             <div className="mt-4">
                                 <SliderWithInput

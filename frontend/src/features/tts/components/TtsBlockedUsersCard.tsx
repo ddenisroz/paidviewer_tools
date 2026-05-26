@@ -53,7 +53,7 @@ export const TtsBlockedUsersCard = ({
         </CardHeader>
 
         <CardContent className="space-y-3.5 p-3.5">
-            <div className="grid gap-2 sm:grid-cols-[130px_minmax(0,1fr)_auto]">
+            <div className="grid grid-cols-[110px_minmax(0,1fr)_auto] gap-2 min-[1280px]:grid-cols-[130px_minmax(0,1fr)_auto]">
                 <Select value={platform} onValueChange={(value) => onPlatformChange(value as BlockedPlatform)}>
                     <SelectTrigger className="h-9 rounded-lg">
                         <SelectValue />
@@ -112,7 +112,7 @@ export const TtsBlockedUsersCard = ({
                 ) : users.length === 0 ? (
                     <div className="h-1" />
                 ) : (
-                    <div className="grid max-h-[min(220px,34vh)] grid-cols-1 gap-2 overflow-y-auto pr-1 custom-scrollbar sm:grid-cols-2">
+                    <div className="grid max-h-[min(220px,34vh)] grid-cols-2 gap-2 overflow-y-auto pr-1 custom-scrollbar">
                         {users.map((user) => (
                             <div
                                 key={`${user.platform}:${user.id || user.username}`}

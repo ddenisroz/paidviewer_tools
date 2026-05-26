@@ -61,8 +61,8 @@ const RewardPlatformRow: React.FC<RewardPlatformRowProps> = ({
     onCreate,
     onDelete,
 }) => (
-    <Card className="border-gray-700 bg-gray-800/30">
-        <CardContent className="p-3 flex items-center justify-between">
+    <Card className="border-border/70 bg-background/30">
+        <CardContent className="flex h-10 items-center justify-between px-3 py-0">
             <div className="flex items-center gap-3">
                 <platform.Icon className={`w-5 h-5 ${platform.accentClassName}`} />
                 <div className="flex items-center gap-2">
@@ -270,14 +270,14 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
     const hasRewardPlatforms = connectedPlatforms.length > 0;
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-2">
             {/* Выбор режима - показываем только если showModeSelector=true */}
             {showModeSelector && (
                 <div className="grid grid-cols-2 gap-2">
                     <button
                         onClick={() => onModeChange('all_messages')}
                         disabled={isSaving}
-                        className={`flex h-11 items-center rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
+                        className={`flex h-10 items-center rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
                             ttsMode === 'all_messages'
                                 ? 'border-sky-500/50 bg-sky-500/10 text-sky-50'
                                 : 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground'
@@ -289,7 +289,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
                     <button
                         onClick={() => onModeChange('channel_points')}
                         disabled={isSaving || !hasRewardPlatforms}
-                        className={`flex h-11 items-center rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
+                        className={`flex h-10 items-center rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
                             !hasRewardPlatforms
                                 ? 'cursor-not-allowed border-border/60 bg-background/20 text-muted-foreground/70 opacity-40'
                                 : ttsMode === 'channel_points'
@@ -304,7 +304,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
 
             {/* Настройка наград */}
             {ttsMode === 'channel_points' && showRewards && (
-                <div className={showModeSelector ? 'pt-3 border-t border-gray-700/30' : 'py-0'}>
+                <div className={showModeSelector ? 'border-t border-border/40 pt-2' : 'py-0'}>
                     <div className="space-y-2">
                         {connectedPlatforms.map((platform) => (
                             <RewardPlatformRow

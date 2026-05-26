@@ -1,7 +1,7 @@
-export const QUALITY_THRESHOLD_GRID_CLASS = 'grid grid-cols-1 gap-3 md:grid-cols-2';
+export const QUALITY_THRESHOLD_GRID_CLASS = 'grid grid-cols-2 gap-3';
 
 export const QUALITY_THRESHOLD_CARD_CLASS =
-    'flex min-h-[124px] flex-col justify-between rounded-lg border border-border/70 bg-card/80 p-3 shadow-sm shadow-black/10';
+    'flex min-h-[112px] flex-col justify-between rounded-lg border border-border/70 bg-card/80 p-3 shadow-sm shadow-black/10';
 
 export const QUALITY_THRESHOLD_STEPPER_CLASS =
     'flex h-8 items-center gap-1 rounded-lg border border-border/70 bg-background/40';

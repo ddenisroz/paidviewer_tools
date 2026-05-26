@@ -12,6 +12,7 @@ interface TtsPlayerSurfaceProps {
 }
 
 const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' }) => {
+    const compact = variant === 'dock';
     const {
         liveMessages,
         currentItem,
@@ -24,21 +25,31 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
         setOutputVolume,
     } = useTtsPlayer();
 
-    const { data: audioSettingsResponse } = useTtsAudioSettings();
+    const { data: audioSettingsResponse } = useTtsAudioSettings({ enabled: !compact });
     const saveAudioSettingsMutation = useSaveTtsAudioSettings({
         onSuccess: () => undefined,
         onError: () => undefined,
     });
-    const [websiteVolume, setWebsiteVolume] = useState<number>(50);
+    const [websiteVolume, setWebsiteVolume] = useState<number>(() => {
+        if (typeof window === 'undefined' || !compact) return 50;
+        const stored = Number(window.localStorage.getItem('tts_obs_dock_volume'));
+        return Number.isFinite(stored) ? Math.max(0, Math.min(100, Math.round(stored))) : 50;
+    });
     const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
+        if (!compact) return;
+        setOutputVolume(websiteVolume);
+    }, [compact, setOutputVolume, websiteVolume]);
+
+    useEffect(() => {
+        if (compact) return;
         const settings = audioSettingsResponse?.data as { websiteVolume?: number } | undefined;
         if (typeof settings?.websiteVolume === 'number') {
             setWebsiteVolume(settings.websiteVolume);
             setOutputVolume(settings.websiteVolume);
         }
-    }, [audioSettingsResponse, setOutputVolume]);
+    }, [audioSettingsResponse, compact, setOutputVolume]);
 
     useEffect(() => {
         return () => {
@@ -51,6 +62,10 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
     const handleVolumeChange = (value: number): void => {
         setWebsiteVolume(value);
         setOutputVolume(value);
+        if (compact) {
+            window.localStorage.setItem('tts_obs_dock_volume', String(value));
+            return;
+        }
         if (volumeDebounceRef.current) {
             clearTimeout(volumeDebounceRef.current);
         }
@@ -60,7 +75,6 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
     };
 
     const hasItems = Boolean(currentItem) || queue.length > 0;
-    const compact = variant === 'dock';
     const messages = liveMessages.slice(0, compact ? 35 : 60);
 
     return (

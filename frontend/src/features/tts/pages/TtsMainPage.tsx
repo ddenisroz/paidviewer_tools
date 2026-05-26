@@ -82,12 +82,6 @@ const unwrapPayload = <T,>(payload: ApiResponse<T> | T | undefined | null): T | 
     return payload as T;
 };
 
-const buildTtsObsUrl = (token?: string | null): string => {
-    const normalizedToken = (token || '').trim();
-    if (!normalizedToken) return '';
-    return `${getApiBaseUrl()}/tts-obs/${normalizedToken}`;
-};
-
 const buildTtsObsDockUrl = (token?: string | null): string => {
     const normalizedToken = (token || '').trim();
     if (!normalizedToken) return '';
@@ -249,8 +243,8 @@ const TtsMainPage: React.FC = () => {
     const isEngineBusy = setEngineMutation.isPending;
     const isEnabled = Boolean(status?.enabled);
     const hasLocalSetup = Boolean(status?.has_local_setup_f5 || status?.has_local_setup);
-    const obsUrl = buildTtsObsUrl(obsUrlResponse?.obs_token);
-    const obsDockUrl = buildTtsObsDockUrl(obsUrlResponse?.obs_token);
+    const obsPlayerUrl = buildTtsObsDockUrl(obsUrlResponse?.obs_token);
+    const obsPlayerConnected = Boolean(obsStatus.dock_connected || obsStatus.source_connected);
 
     const gcloudVoiceOptions = useMemo(
         () =>
@@ -362,7 +356,7 @@ const TtsMainPage: React.FC = () => {
     };
 
     const renderToggle = (label: string, checked: boolean, onChange: (value: boolean) => void) => (
-        <div className="flex h-12 items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/35 px-3">
+        <div className="flex h-11 items-center justify-between gap-2 rounded-lg border border-border/70 bg-background/35 px-3">
             <span className="text-sm font-bold text-foreground">{label}</span>
             <Switch checked={checked} onCheckedChange={onChange} disabled={saveSettingsMutation.isPending} />
         </div>
@@ -380,20 +374,20 @@ const TtsMainPage: React.FC = () => {
                 </CardContent>
             </Card>
 
-            <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(360px,0.82fr)_minmax(520px,1fr)]">
-                <div className="h-full space-y-3">
-                    <Card className="card-glass flex h-full min-h-[420px] flex-col border-border/70 xl:max-w-[660px]">
-                        <CardHeader className="border-b border-white/5 pb-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-stretch gap-3">
+                <div className="min-w-0">
+                    <Card className="card-glass flex h-full min-h-[388px] flex-col border-border/70">
+                        <CardHeader className="border-b border-white/5 px-3.5 pb-2.5 pt-3.5">
                             <CardTitle className="text-base font-bold">Озвучка</CardTitle>
                         </CardHeader>
-                        <CardContent className="flex flex-1 flex-col space-y-3.5 overflow-y-auto p-4">
+                        <CardContent className="flex flex-1 flex-col gap-3 overflow-hidden p-3.5">
                             <TtsChannelPointsMode
                                 ttsMode={ttsMode}
                                 onModeChange={handleModeChange}
                                 isSaving={isSaving}
                             />
 
-                            <div className="grid gap-2 sm:grid-cols-3">
+                            <div className="grid grid-cols-3 gap-2">
                                 {(Object.entries(ENGINE_COPY) as Array<[EngineType, (typeof ENGINE_COPY)[EngineType]]>).map(
                                     ([engine, meta]) => {
                                         const disabled = engine === 'f5_local' && !hasLocalSetup;
@@ -404,7 +398,7 @@ const TtsMainPage: React.FC = () => {
                                                 type="button"
                                                 onClick={() => handleEngineChange(engine)}
                                                 disabled={disabled || isEngineBusy}
-                                                className={`h-11 rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
+                                                className={`h-10 rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
                                                     active
                                                         ? 'border-sky-500/60 bg-sky-500/10 text-sky-50'
                                                         : 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground'
@@ -417,7 +411,7 @@ const TtsMainPage: React.FC = () => {
                                 )}
                             </div>
 
-                            <div className="grid gap-3 md:grid-cols-[128px_minmax(0,1fr)] md:items-center">
+                            <div className="grid grid-cols-[118px_minmax(0,1fr)] items-center gap-3">
                                 <div className="text-sm font-bold leading-tight text-foreground">Режим подключения</div>
                                 <div className="grid grid-cols-2 gap-2">
                                     {(['website', 'obs'] as ListeningMode[]).map((mode) => (
@@ -426,7 +420,7 @@ const TtsMainPage: React.FC = () => {
                                             type="button"
                                             onClick={() => handleListeningModeChange(mode)}
                                             disabled={setListeningModeMutation.isPending}
-                                            className={`h-11 rounded-lg border px-3 text-sm font-bold transition-colors ${
+                                            className={`h-10 rounded-lg border px-3 text-sm font-bold transition-colors ${
                                                 listeningMode === mode
                                                     ? 'border-sky-500/60 bg-sky-500/10 text-sky-50'
                                                     : 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground'
@@ -438,13 +432,13 @@ const TtsMainPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="flex min-h-[150px] flex-1">
+                            <div className="flex min-h-[112px] flex-1">
                                 {listeningMode === 'obs' ? (
-                                    <div className="space-y-3 rounded-lg border border-border/70 bg-background/35 p-3">
+                                    <div className="w-full space-y-2.5 rounded-lg border border-border/70 bg-background/35 p-2.5">
                                         <div className="flex items-center gap-2">
-                                            <Input value={obsUrl || 'OBS source не создан'} readOnly className="h-9 min-w-0 font-mono text-xs" />
-                                            {obsUrl ? (
-                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsUrl)}>
+                                            <Input value={obsPlayerUrl || 'OBS player URL не создан'} readOnly className="h-9 min-w-0 font-mono text-xs" />
+                                            {obsPlayerUrl ? (
+                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsPlayerUrl)}>
                                                     <Copy className="h-4 w-4" />
                                                 </Button>
                                             ) : (
@@ -453,41 +447,29 @@ const TtsMainPage: React.FC = () => {
                                                 </Button>
                                             )}
                                         </div>
-                                        {obsDockUrl ? (
-                                            <div className="flex items-center gap-2">
-                                                <Input value={obsDockUrl} readOnly className="h-9 min-w-0 font-mono text-xs" />
-                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsDockUrl)}>
-                                                    <Copy className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ) : null}
                                         <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
-                                            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
-                                                <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.source_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
-                                                OBS Source
-                                            </span>
-                                            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
-                                                <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.dock_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
-                                                Док-панель
+                                            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-2.5 py-1">
+                                                <span className={`h-2.5 w-2.5 rounded-full ${obsPlayerConnected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
+                                                OBS плеер
                                             </span>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="flex h-full w-full items-center justify-center">
-                                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                                            <div className="justify-self-end text-right font-brand text-lg font-bold leading-tight text-emerald-100">
+                                        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+                                            <div className="justify-self-end text-right font-brand text-base font-bold leading-tight text-emerald-100">
                                                 Начать слушать чат
                                             </div>
-                                        <a
-                                            href="/tts/player"
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            aria-label="Открыть TTS Player"
-                                            title="Открыть TTS Player"
-                                            className="inline-flex h-16 w-16 items-center justify-center rounded-full border border-emerald-400/70 bg-emerald-500/20 text-emerald-100 shadow-lg shadow-emerald-950/30 transition-colors hover:bg-emerald-500/30"
-                                        >
-                                            <CirclePlay className="h-8 w-8" />
-                                        </a>
+                                            <a
+                                                href="/tts/player"
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                aria-label="Открыть TTS Player"
+                                                title="Открыть TTS Player"
+                                                className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/70 bg-emerald-500/20 text-emerald-100 shadow-lg shadow-emerald-950/30 transition-colors hover:bg-emerald-500/30"
+                                            >
+                                                <CirclePlay className="h-7 w-7" />
+                                            </a>
                                             <span aria-hidden="true" />
                                         </div>
                                     </div>
@@ -495,7 +477,7 @@ const TtsMainPage: React.FC = () => {
                             </div>
 
                             {selectedEngine === 'gcloud' ? (
-                                <div className="grid gap-3 rounded-lg border border-border/70 bg-background/35 p-3 md:grid-cols-2">
+                                <div className="grid grid-cols-2 gap-3 rounded-lg border border-border/70 bg-background/35 p-3">
                                     <Select value={selectedGcloudVoice} onValueChange={handleGcloudVoiceChange}>
                                         <SelectTrigger className="h-10 rounded-lg">
                                             <SelectValue placeholder="Голос" />
@@ -528,19 +510,19 @@ const TtsMainPage: React.FC = () => {
 
                 </div>
 
-                <div className="space-y-3">
+                <div className="grid min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
                     <Card className="card-glass border-border/70">
-                        <CardHeader className="border-b border-white/5 pb-3">
+                        <CardHeader className="border-b border-white/5 px-3.5 pb-2.5 pt-3.5">
                             <CardTitle className="text-base font-bold">Источники озвучки</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2.5 p-4">
+                        <CardContent className="space-y-2 p-3.5">
                             {platformConfig.map(({ platform, label, Icon }) => {
                                 const connected = connectedPlatforms.includes(platform);
                                 const enabled = connected && enabledPlatforms.includes(platform);
                                 return (
                                     <div
                                         key={platform}
-                                        className={`flex items-center justify-between rounded-lg border border-border/70 bg-background/35 px-4 py-3 ${
+                                        className={`flex h-11 items-center justify-between rounded-lg border border-border/70 bg-background/35 px-3 ${
                                             connected ? '' : 'opacity-40'
                                         }`}
                                     >
@@ -559,11 +541,11 @@ const TtsMainPage: React.FC = () => {
                         </CardContent>
                     </Card>
 
-                    <Card className="card-glass border-border/70">
-                        <CardHeader className="border-b border-white/5 pb-3">
+                    <Card className="card-glass flex min-h-0 flex-col border-border/70">
+                        <CardHeader className="border-b border-white/5 px-3.5 pb-2.5 pt-3.5">
                             <CardTitle className="text-base font-bold">Фильтры озвучки</CardTitle>
                         </CardHeader>
-                        <CardContent className="grid gap-2 p-4 sm:grid-cols-2">
+                        <CardContent className="grid flex-1 grid-cols-2 content-start gap-2 p-3.5">
                             {renderToggle('Озвучивать упоминания', !settingsState.filterMentions, (value) =>
                                 saveBoolean('filterMentions', !value)
                             )}
@@ -579,7 +561,7 @@ const TtsMainPage: React.FC = () => {
                             {renderToggle('Озвучивать ник отправителя', settingsState.speakSenderName, (value) =>
                                 saveBoolean('speakSenderName', value)
                             )}
-                            <div className="rounded-lg border border-border/70 bg-background/35 px-3 py-3 sm:col-span-2">
+                            <div className="col-span-2 rounded-lg border border-border/70 bg-background/35 px-3 py-3">
                                 <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-foreground">
                                     <span>Макс. длина</span>
                                     <span>{settingsState.maxMessageLength} символов</span>
@@ -598,7 +580,7 @@ const TtsMainPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid items-start gap-3 xl:grid-cols-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3">
                 <TtsForbiddenWordsCard
                     words={filteredWords}
                     isLoading={filteredWordsLoading}

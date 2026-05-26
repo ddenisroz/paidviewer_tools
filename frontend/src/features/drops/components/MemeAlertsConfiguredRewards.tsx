@@ -66,7 +66,7 @@ const ConfiguredRewardRow: React.FC<ConfiguredRewardRowProps> = ({
     onEdit,
     onDelete,
 }) => (
-    <div className={cn(MUTED_PANEL_CLASS, 'grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center')}>
+    <div className={cn(MUTED_PANEL_CLASS, 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 p-3')}>
         <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="truncate text-sm font-semibold text-foreground">{reward.reward_title || 'MemeCoins'}</span>
@@ -83,7 +83,7 @@ const ConfiguredRewardRow: React.FC<ConfiguredRewardRowProps> = ({
                 </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-                {reward.reward_cost} баллов → {reward.coins_amount} мемкоинов
+                {reward.reward_cost} баллов {'->'} {reward.coins_amount} мемкоинов
             </p>
         </div>
         <div className="flex gap-2">

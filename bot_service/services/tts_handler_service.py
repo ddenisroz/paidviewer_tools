@@ -120,8 +120,8 @@ class TTSHandlerService:
                     )
                     return {"success": False, "error": user_data["error"]}
 
-                # 3.1 Sink guard: do not synthesize without an active playback sink.
-                sink_result = self._check_active_tts_sink(user_data, connection_manager, platform)
+                # 3.1 Sink guard: give a just-opened player/source a short moment to register.
+                sink_result = await self._wait_for_active_tts_sink(user_data, connection_manager, platform)
                 if sink_result:
                     await self._broadcast_status(
                         user_data,
@@ -148,7 +148,12 @@ class TTSHandlerService:
 
                 request_lock = self._get_user_request_lock(user_data["user_id"])
                 async with request_lock:
-                    sink_result = self._check_active_tts_sink(user_data, connection_manager, platform)
+                    sink_result = await self._wait_for_active_tts_sink(
+                        user_data,
+                        connection_manager,
+                        platform,
+                        timeout_sec=0.5,
+                    )
                     if sink_result:
                         await self._broadcast_status(
                             user_data,
@@ -375,6 +380,34 @@ class TTSHandlerService:
             user_id,
         )
         return {"success": False, "error": "Unsupported listening mode"}
+
+    async def _wait_for_active_tts_sink(
+        self,
+        user_data: Dict[str, Any],
+        connection_manager: Any,
+        platform: str,
+        *,
+        timeout_sec: float = 2.0,
+        interval_sec: float = 0.1,
+    ) -> Optional[Dict[str, Any]]:
+        deadline = time.monotonic() + max(0.0, timeout_sec)
+        last_result = self._check_active_tts_sink(user_data, connection_manager, platform)
+        if not last_result:
+            return None
+
+        user_id = user_data.get("user_id")
+        while time.monotonic() < deadline:
+            await asyncio.sleep(interval_sec)
+            last_result = self._check_active_tts_sink(user_data, connection_manager, platform)
+            if not last_result:
+                logger.info(
+                    "[TRACE] [%s TTS] Playback sink became ready after grace wait for user %s",
+                    platform.upper(),
+                    user_id,
+                )
+                return None
+
+        return last_result
 
     async def _process_filters(self, db, text, username, platform, is_reply, mentioned_users, reward_id, user_data):
         user_id = user_data["user_id"]
@@ -734,11 +767,14 @@ class TTSHandlerService:
 
     async def _match_filtered_word(self, tts_service, user_id, platform, text) -> Optional[str]:
         words = await tts_service.get_filtered_words(user_id)
+        normalized_platform = str(platform or "").strip().lower()
+        normalized_text = str(text or "").casefold()
         filtered_words = sorted(
             {
-                str(w["word"]).strip().lower()
+                str(w["word"]).strip().casefold()
                 for w in words
-                if w.get("word") and w.get("platform") in ("all", platform)
+                if w.get("word")
+                and str(w.get("platform") or "all").strip().lower() in ("all", normalized_platform)
             },
             key=len,
             reverse=True,
@@ -747,7 +783,6 @@ class TTSHandlerService:
         if not filtered_words:
             return None
 
-        normalized_text = str(text or "").lower()
         for word in filtered_words:
             if word and word in normalized_text:
                 return word

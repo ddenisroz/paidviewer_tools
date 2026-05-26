@@ -66,7 +66,7 @@ const PLAYER_CONTROL_BUTTON_CLASS =
 const PLAYER_DANGER_BUTTON_CLASS =
     'border-red-500/30 bg-background/60 text-red-400 hover:bg-background/60 hover:text-red-300';
 const PLAYER_STATUS_BUTTON_CLASS =
-    'h-10 px-3 gap-2 border-border/60 bg-background/60 disabled:opacity-60 hover:bg-background/60';
+    'h-9 px-3 gap-2 border-border/60 bg-background/60 disabled:opacity-60 hover:bg-background/60';
 
 const YoutubeIntegrationPage: React.FC = () => {
     const navigate = useNavigate();
@@ -640,9 +640,9 @@ const YoutubeIntegrationPage: React.FC = () => {
             {!isTheaterMode ? (
                 <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
                     <Card className="card-glass">
-                        <CardContent className="p-4">
-                            <div className="w-full flex flex-col xl:flex-row gap-4 items-start">
-                                <div className="w-full xl:w-[clamp(260px,32vw,360px)] space-y-3">
+                        <CardContent className="p-3">
+                            <div className="grid w-full grid-cols-[minmax(220px,320px)_minmax(0,1fr)] items-start gap-3">
+                                <div className="w-full space-y-3">
                                     <div
                                         className="relative bg-black rounded-lg overflow-hidden aspect-video cursor-pointer"
                                         onPointerDown={markUserStarted}
@@ -662,8 +662,8 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="w-full xl:flex-1 space-y-3 xl:ml-0">
-                                    <div className="card-glass w-full rounded-xl p-3 space-y-3">
+                                <div className="min-w-0 space-y-3">
+                                    <div className="card-glass w-full rounded-xl p-3 space-y-2.5">
                                         <div className="flex flex-wrap items-center justify-between gap-3">
                                             <div className="flex items-center gap-2">
                                                 <Button
@@ -672,7 +672,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     size="icon"
                                                     title={isPlaying ? 'Пауза' : 'Плей'}
                                                     aria-label={isPlaying ? 'Пауза' : 'Плей'}
-                                                    className="h-12 w-12"
+                                                    className="h-10 w-10"
                                                 >
                                                     {isPlaying ? (
                                                         <Pause className="w-5 h-5" />
@@ -687,7 +687,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     disabled={!hasVideo}
                                                     title="Следующее"
                                                     aria-label="Следующее"
-                                                    className={cn('h-12 w-12', PLAYER_CONTROL_BUTTON_CLASS)}
+                                                    className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
                                                 >
                                                     <SkipForward className="w-5 h-5" />
                                                 </Button>
@@ -721,14 +721,14 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     onClick={() => setIsSettingsDialogOpen(true)}
                                                     title="Настройки заказа"
                                                     aria-label="Настройки заказа"
-                                                    className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
+                                                    className={cn('h-9 w-9', PLAYER_CONTROL_BUTTON_CLASS)}
                                                 >
                                                     <Settings className="h-4 w-4" />
                                                 </Button>
                                                 <Button
                                                     variant="outline"
                                                     size="icon"
-                                                    className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
+                                                    className={cn('h-9 w-9', PLAYER_CONTROL_BUTTON_CLASS)}
                                                     onClick={handleToggleTheater}
                                                     title={
                                                         isTheaterMode ? 'Выйти из режима театра' : 'Театральный режим'
@@ -750,7 +750,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     disabled={!hasVideo}
                                                     title="Очистить очередь"
                                                     aria-label="Очистить очередь"
-                                                    className={cn('h-10 w-10', PLAYER_DANGER_BUTTON_CLASS)}
+                                                    className={cn('h-9 w-9', PLAYER_DANGER_BUTTON_CLASS)}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
@@ -764,7 +764,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 disabled={!hasVideo}
                                                 title={isMuted ? 'Включить звук' : 'Выключить звук'}
                                                 aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}
-                                                className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
+                                                className={cn('h-9 w-9', PLAYER_CONTROL_BUTTON_CLASS)}
                                             >
                                                 {isMuted ? (
                                                     <VolumeX className="w-4 h-4" />
@@ -809,7 +809,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                 </div>
             ) : (
                 <Card className="transition-all duration-300 w-full bg-black border-none h-full">
-                    <CardContent className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] gap-3 h-full p-3">
+                    <CardContent className="grid h-full grid-cols-[minmax(0,1fr)_minmax(240px,360px)] gap-3 p-3">
                         <div className="flex flex-col h-full min-h-0 overflow-hidden">
                             <div
                                 className="flex-1 min-h-0 bg-black rounded-lg overflow-hidden relative cursor-pointer"

@@ -55,6 +55,8 @@ const CoreProviders = composeProviders(
     UserSettingsProvider
 );
 
+const TtsDockProviders = composeProviders(ToastProvider, TtsPlayerProvider);
+
 // Компонент-обёртка для условного рендера контекстов
 interface ConditionalContextWrapperProps {
     children: React.ReactNode;
@@ -70,6 +72,10 @@ const ConditionalContextWrapper: React.FC<ConditionalContextWrapperProps> = ({ c
         location.pathname.startsWith('/tts-obs') ||
         location.pathname.startsWith('/youtube-obs') ||
         location.pathname.startsWith('/drops-widget');
+
+    if (location.pathname.startsWith('/tts/obs-dock')) {
+        return <TtsDockProviders>{children}</TtsDockProviders>;
+    }
 
     if (isOverlayRoute) {
         return <ToastProvider>{children}</ToastProvider>;

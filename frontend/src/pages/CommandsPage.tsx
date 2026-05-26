@@ -777,7 +777,7 @@ const CommandsPage: React.FC = () => {
                     <Card className={SURFACE_CARD_CLASS}>
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between mb-4" />
-                            <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_170px_190px] gap-2 mb-4 items-center">
+                            <div className="mb-4 grid grid-cols-[minmax(220px,1fr)_150px_170px] items-center gap-2 min-[1280px]:grid-cols-[minmax(280px,1fr)_170px_190px]">
                                 <div className="flex-1">
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -908,7 +908,7 @@ const CommandsPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-3">
+                            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 min-[1280px]:grid-cols-[repeat(3,minmax(0,1fr))]">
                                 {getFilteredBasicCommands().map((command: ChatCommand) => (
                                     <div key={command.id || command.name}>
                                         <CommandCard
@@ -1204,7 +1204,7 @@ const CommandsPage: React.FC = () => {
                             {customCommands.length > 0 && (
                                 <>
                                     <div className="flex items-center justify-between mb-4" />
-                                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_170px_190px] gap-2 mb-4 items-center">
+                                    <div className="mb-4 grid grid-cols-[minmax(220px,1fr)_150px_170px] items-center gap-2 min-[1280px]:grid-cols-[minmax(280px,1fr)_170px_190px]">
                                         <div className="flex-1">
                                             <div className="relative">
                                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -1257,7 +1257,7 @@ const CommandsPage: React.FC = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-3">
+                                <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 min-[1280px]:grid-cols-[repeat(3,minmax(0,1fr))]">
                                     {getFilteredCustomCommands().map((command: ChatCommand) => (
                                         <div key={command.id || command.name}>
                                             <CommandCard
@@ -1283,7 +1283,7 @@ const CommandsPage: React.FC = () => {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_160px_180px] gap-2">
+                            <div className="grid grid-cols-[minmax(220px,1fr)_150px_170px] gap-2 min-[1280px]:grid-cols-[minmax(220px,1fr)_160px_180px]">
                                 <div className="relative">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
@@ -1324,7 +1324,7 @@ const CommandsPage: React.FC = () => {
                                     {commandHistory.map((cmd) => (
                                         <div
                                             key={`hist-${cmd.id}`}
-                                            className="grid gap-2 rounded-md border border-border/70 bg-card/60 p-2.5 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_auto]"
+                                            className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_auto] gap-2 rounded-md border border-border/70 bg-card/60 p-2.5"
                                         >
                                             <div className="min-w-0">
                                                 <div className="font-mono text-sm text-foreground truncate">

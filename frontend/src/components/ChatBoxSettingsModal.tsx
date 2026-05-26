@@ -287,21 +287,13 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                     </div>
 
                     {/* Content */}
-                    <div
-                        className={`flex-1 overflow-auto p-5 flex gap-6 min-h-0 bg-background ${
-                            isHorizontalPreview ? 'flex-col' : 'flex-col lg:flex-row'
-                        }`}
-                    >
+                    <div className="grid flex-1 grid-cols-[minmax(260px,0.42fr)_minmax(0,1fr)] gap-4 overflow-hidden bg-background p-4 min-[1280px]:gap-6 min-[1280px]:p-5">
                         {/* Left: Preview */}
                         <div
-                            className={`w-full flex-shrink-0 flex flex-col gap-3 min-h-0 ${
-                                isHorizontalPreview ? 'order-2' : 'lg:w-80 overflow-y-auto pr-1'
-                            }`}
+                            className="flex min-h-0 w-full flex-col gap-3"
                         >
                             <div
-                                className={`border border-border/60 rounded-lg overflow-hidden bg-card/60 ${
-                                    isHorizontalPreview ? 'h-[380px] min-h-[320px] flex-none' : 'flex-1 min-h-[240px]'
-                                }`}
+                                className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border/60 bg-card/60"
                             >
                                 <PreviewPanel
                                     settings={settings}
@@ -345,7 +337,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                         </div>
 
                         {/* Right: Settings Tabs */}
-                        <div className={`${isHorizontalPreview ? 'order-1' : ''} flex-1 min-w-0 min-h-0`}>
+                        <div className="min-h-0 min-w-0">
                             <Tabs defaultValue="appearance" className="h-full flex flex-col overflow-hidden min-h-0">
                                 <TabsList className="mb-4 grid grid-cols-3 gap-2 bg-transparent p-0 font-base">
                                     <TabsTrigger
@@ -375,7 +367,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                 >
                                     <div className={SETTINGS_SECTION_CLASS}>
                                         <div className={SETTINGS_SECTION_TITLE_CLASS}>Типографика</div>
-                                        <div className="grid gap-4 md:grid-cols-3">
+                                        <div className="grid grid-cols-3 gap-4">
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Шрифт</Label>
                                                 <Select
@@ -444,7 +436,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
                                     <div className={SETTINGS_SECTION_CLASS}>
                                         <div className={SETTINGS_SECTION_TITLE_CLASS}>Цвета</div>
-                                        <div className="grid gap-3 md:grid-cols-3">
+                                        <div className="grid grid-cols-3 gap-3">
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Цвет фона</Label>
                                                 <ColorInput
@@ -469,7 +461,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                 />
                                             </div>
                                         </div>
-                                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                                        <div className="grid grid-cols-[minmax(0,1fr)_220px] gap-3">
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Обводка текста</Label>
                                                 <ColorInput
@@ -537,7 +529,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                             </Select>
                                         </div>
 
-                                        <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Длительность</Label>
                                                 <SliderWithInput
@@ -575,7 +567,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                 >
                                     <div className={SETTINGS_SECTION_CLASS}>
                                         <div className={SETTINGS_SECTION_TITLE_CLASS}>Отображение</div>
-                                        <div className="grid gap-3 sm:grid-cols-2">
+                                        <div className="grid grid-cols-2 gap-3">
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">Иконки платформ</Label>
                                                 <Switch
@@ -623,7 +615,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
                                     <div className={SETTINGS_SECTION_CLASS}>
                                         <div className={SETTINGS_SECTION_TITLE_CLASS}>Разметка</div>
-                                        <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Ширина</Label>
                                                 <SliderWithInput
@@ -657,7 +649,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                             </div>
                                         </div>
 
-                                        <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Макс. сообщений</Label>
                                                 <SliderWithInput

@@ -389,7 +389,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
 
         return (
             <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="grid grid-cols-[minmax(0,1fr)_clamp(280px,27vw,360px)] gap-3 min-[1280px]:gap-4">
                     <div className="space-y-4">
                         {QUALITIES.map((qualityItem) => {
                             const qualityRewards = rewardsByQuality(qualityItem.name);
@@ -422,7 +422,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
                                     </CardHeader>
                                     <CardContent>
                                         {isRewardsLayoutLoading ? (
-                                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                                            <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2.5">
                                                 {Array.from({ length: QUALITY_CARD_SKELETON_COUNT }).map((_, index) => (
                                                     <div
                                                         key={`${qualityItem.name}-skeleton-${index}`}
@@ -435,7 +435,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
                                                 Наград пока нет
                                             </div>
                                         ) : (
-                                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                                            <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2.5">
                                                 {qualityRewards.map((reward) => {
                                                     const isSelected =
                                                         editorMode === 'edit' && Number(reward.id) === selectedRewardId;

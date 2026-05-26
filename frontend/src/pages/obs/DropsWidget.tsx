@@ -8,8 +8,6 @@ import { getDropsWidgetWebSocketUrl, resolveAudioUrl } from '@/shared/utils/urlU
 
 import {
     DropsWidgetOpeningStage,
-    DropsWidgetPreviewBadge,
-    DropsWidgetPreviewPanel,
     DropsWidgetReelStage,
     DropsWidgetResultPanel,
     qualityLabel,
@@ -93,7 +91,7 @@ interface WidgetConfig {
     sound_volume: number;
 }
 
-const CARD_WIDTH = 188;
+const CARD_WIDTH = 184;
 const CARD_GAP = 16;
 const CARD_STEP = CARD_WIDTH + CARD_GAP;
 const WINNER_SLOT_INDEX = 26;
@@ -119,7 +117,7 @@ const DropsWidget: React.FC = () => {
     const [previewRewards, setPreviewRewards] = useState<Reward[]>([]);
     const [phase, setPhase] = useState<AnimationPhase>('idle');
     const [isPreviewMode, setIsPreviewMode] = useState(false);
-    const [status, setStatus] = useState('Подключение...');
+    const [, setStatus] = useState('Подключение...');
     const [translateX, setTranslateX] = useState('translate3d(0px, 0, 0)');
     const [pointerKick, setPointerKick] = useState(false);
     const [mythicalSession, setMythicalSession] = useState<MythicalSession | null>(null);
@@ -535,15 +533,6 @@ const DropsWidget: React.FC = () => {
     }, [clearAnimations, clearMythicalTimer, isPreviewMode, loadMythicalSession, resolveWidgetContext, runRewardAnimation, token]);
 
     const currentQuality = (currentReward?.quality || currentReward?.quality_name || 'common').toLowerCase();
-    const previewByQuality = useMemo(
-        () =>
-            ['common', 'rare', 'epic', 'legendary', 'mythical'].map((quality) => ({
-                quality,
-                count: previewRewards.filter((reward) => (reward.quality?.name || 'common').toLowerCase() === quality).length,
-            })),
-        [previewRewards]
-    );
-
     useEffect(() => {
         if (!isPreviewMode || autoPreviewStartedRef.current || phase !== 'idle') return;
         const quality = (searchParams.get('quality') || '').toLowerCase();
@@ -570,19 +559,7 @@ const DropsWidget: React.FC = () => {
     }
 
     if (phase === 'idle' || !currentReward) {
-        if (!isPreviewMode) {
-            return <div className={`fixed inset-0 ${idleBackground}`} />;
-        }
-
-        return (
-            <div className={`fixed inset-0 ${idleBackground}`}>
-                <DropsWidgetPreviewPanel
-                    previewByQuality={previewByQuality}
-                    status={status}
-                    onTriggerPreview={(quality) => void triggerPreviewChest(quality)}
-                />
-            </div>
-        );
+        return <div className={`fixed inset-0 ${idleBackground}`} />;
     }
 
     return (
@@ -621,7 +598,6 @@ const DropsWidget: React.FC = () => {
                 </div>
             </div>
 
-            {isPreviewMode ? <DropsWidgetPreviewBadge /> : null}
         </div>
     );
 };

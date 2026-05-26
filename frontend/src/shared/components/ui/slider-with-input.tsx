@@ -70,7 +70,7 @@ export const SliderWithInput: React.FC<SliderWithInputProps> = ({
     };
 
     return (
-        <div className={cn('flex flex-col gap-2 md:flex-row md:items-center md:gap-3 min-w-0', className)}>
+        <div className={cn('flex min-w-0 items-center gap-3', className)}>
             <Slider
                 value={[value]}
                 min={min}

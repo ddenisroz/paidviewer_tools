@@ -8,7 +8,7 @@ import { DROPS_CONSTANTS } from '@/constants/drops';
 import { useDropsConfig } from '@/features/drops/hooks/useDropsConfig';
 import { dropsService } from '@/services/api/services/dropsService';
 import { Button } from '@/shared/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
@@ -317,17 +317,16 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
 
     return (
         <div className="space-y-4">
-            {/* Предупреждение если нет наград */}
             {!hasRewards && (
                 <Card className="border-amber-500/35 bg-amber-500/10 shadow-sm shadow-black/20">
                     <CardContent className="p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-400/40 flex-shrink-0">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <div className="flex-shrink-0 rounded-lg border border-amber-400/40 bg-amber-500/15 p-2">
                                     <AlertTriangle className="h-4 w-4 text-amber-300" />
                                 </div>
-                                <p className="text-sm text-amber-100/90 break-words">
-                                    Сначала настройте содержимое сундуков на вкладке{' '}
+                                <p className="text-sm text-amber-100/90">
+                                    Сначала добавьте награды на вкладке{' '}
                                     <strong className="text-amber-50">"Награды"</strong>.
                                 </p>
                             </div>
@@ -335,9 +334,9 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
                                 onClick={() => navigate('/dashboard/drops?tab=rewards')}
                                 variant="outline"
                                 size="sm"
-                                className="h-8 text-xs flex-shrink-0 border-amber-300/40 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
+                                className="h-8 flex-shrink-0 border-amber-300/40 bg-amber-500/10 text-xs text-amber-100 hover:bg-amber-500/20"
                             >
-                                <Package className="w-3.5 h-3.5 mr-1.5" />
+                                <Package className="mr-1.5 h-3.5 w-3.5" />
                                 Настроить награды
                             </Button>
                         </div>
@@ -345,17 +344,12 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
                 </Card>
             )}
 
-            {/* Календарь дней стрика - поднят вверх */}
             <Card className={SURFACE_CARD_CLASS}>
                 <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between flex-wrap gap-3">
-                        {/* Заголовок календаря - слева */}
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold">Календарь стриков</h3>
-                        </div>
+                    <div className="flex min-h-10 flex-wrap items-center justify-between gap-3">
+                        <CardTitle className="text-lg">Календарь стриков</CardTitle>
 
-                        {/* Переключатели для каждой платформы - справа */}
-                        <div className="flex items-center gap-4 flex-wrap">
+                        <div className="flex flex-wrap items-center gap-4">
                             {twitchAvailable && (
                                 <div className="flex items-center gap-2">
                                     <Label className="text-sm font-medium">Twitch</Label>

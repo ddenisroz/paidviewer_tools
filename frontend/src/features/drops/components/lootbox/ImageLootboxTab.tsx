@@ -58,7 +58,7 @@ const ImageLootboxTab: React.FC<ImageLootboxTabProps> = ({
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-4 gap-3 min-[1280px]:gap-6">
                 {imageLootboxes.map((lootbox) => {
                     const lootboxForConfig = {
                         ...lootbox,

@@ -79,7 +79,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ gameFieldData, onDayClick }) 
                 ))}
             </div>
 
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="mt-6 grid grid-cols-4 gap-3 min-[1280px]:gap-4">
                 <div className="bg-gray-700 rounded-lg p-3 text-center">
                     <div className="text-2xl font-bold text-green-400">{activeDays}</div>
                     <div className="text-xs text-gray-300">Активные дни</div>

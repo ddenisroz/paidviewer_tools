@@ -156,7 +156,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="grid gap-2 md:grid-cols-[minmax(240px,1fr)_190px_170px]">
+                <div className="grid grid-cols-[minmax(220px,1fr)_170px_150px] gap-2 min-[1280px]:grid-cols-[minmax(240px,1fr)_190px_170px]">
                     <div className="relative">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -205,7 +205,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
                         filteredHistory.map((entry) => (
                             <div
                                 key={entry.id}
-                                className="grid items-center gap-3 rounded-lg border border-border/70 bg-transparent p-2.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_190px]"
+                                className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_170px] items-center gap-2 rounded-lg border border-border/70 bg-transparent p-2.5 min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_190px] min-[1280px]:gap-3"
                             >
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">

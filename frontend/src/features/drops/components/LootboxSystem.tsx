@@ -69,7 +69,7 @@ const LootboxSystem: React.FC<LootboxSystemProps> = ({ channelName }) => {
                     <div className="h-8 w-48 bg-muted animate-pulse rounded"></div>
                     <div className="h-4 w-96 bg-muted animate-pulse rounded"></div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-3 gap-3 min-[1280px]:gap-4">
                     <CardSkeleton />
                     <CardSkeleton />
                     <CardSkeleton />

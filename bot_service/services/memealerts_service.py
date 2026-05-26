@@ -24,10 +24,7 @@ logger = logging.getLogger(__name__)
 MEMEALERTS_API_BASE = "https://memealerts.com/api"
 MEMEALERTS_OBJECT_ID_RE = re.compile(r"^[a-fA-F0-9]{24}$")
 MEMEALERTS_BROWSER_HEADERS = {
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Origin": "https://memealerts.com",
-    "Referer": "https://memealerts.com/",
+    "Accept": "application/json",
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -1227,12 +1224,21 @@ class MemeAlertsService:
                 detail = response.text if response else None
                 error_message = f"API Error: {status_code if status_code is not None else 'unknown'}"
                 if status_code in (401, 403, 404):
-                    error_message = (
-                        "Пользователь не найден в MemeAlerts supporters или недоступен для выдачи"
-                    )
+                    error_message = "Пользователь не найден в MemeAlerts supporters или недоступен для выдачи"
+                logger.warning(
+                    "MemeAlerts give-bonus failed: status=%s target_resolved=%s streamer_id_present=%s body=%s",
+                    status_code,
+                    bool(target_user_id),
+                    bool(streamer_id),
+                    (detail or "")[:500],
+                )
                 return {
                     "success": False,
-                    "error": error_message,
+                    "error": (
+                        "Пользователь не найден в MemeAlerts supporters или недоступен для выдачи"
+                        if status_code in (401, 403, 404)
+                        else error_message
+                    ),
                     "detail": detail,
                     "status_code": status_code,
                 }

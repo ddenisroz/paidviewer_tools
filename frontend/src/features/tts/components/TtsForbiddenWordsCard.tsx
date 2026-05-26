@@ -46,7 +46,7 @@ export const TtsForbiddenWordsCard = ({
             </CardHeader>
 
             <CardContent className="space-y-3.5 p-3.5">
-                <div ref={formRef} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <div ref={formRef} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                     <Input
                         placeholder="Слово или фраза"
                         name="tts_manual_forbidden_word"
@@ -102,7 +102,7 @@ export const TtsForbiddenWordsCard = ({
                     ) : visibleWords.length === 0 ? (
                         <div className="h-1" />
                     ) : (
-                        <div className="grid max-h-[min(220px,34vh)] grid-cols-1 gap-2 overflow-y-auto pr-1 custom-scrollbar sm:grid-cols-2">
+                        <div className="grid max-h-[min(220px,34vh)] grid-cols-2 gap-2 overflow-y-auto pr-1 custom-scrollbar">
                             {visibleWords.map((word) => (
                                 <div
                                     key={word.id}

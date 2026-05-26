@@ -45,7 +45,7 @@ const QueueList: React.FC<QueueListProps> = ({
                     className={
                         compact
                             ? 'grid grid-cols-[28px_minmax(0,1fr)_minmax(0,0.8fr)_72px] items-center gap-3 border-b border-border/70 bg-card/90 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground'
-                            : 'grid grid-cols-[28px_minmax(0,1fr)_64px_72px] md:grid-cols-[28px_minmax(0,1fr)_120px_64px_72px] items-center gap-3 border-b border-border/70 bg-card/90 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground'
+                            : 'grid grid-cols-[28px_minmax(0,1fr)_96px_64px_72px] items-center gap-3 border-b border-border/70 bg-card/90 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground min-[1280px]:grid-cols-[28px_minmax(0,1fr)_120px_64px_72px]'
                     }
                 >
                     <div className="text-center">#</div>
@@ -60,7 +60,7 @@ const QueueList: React.FC<QueueListProps> = ({
                     ) : (
                         <>
                             <div className="whitespace-nowrap">{'\u0422\u0440\u0435\u043a'}</div>
-                            <div className="hidden md:flex w-full items-center justify-center gap-1 whitespace-nowrap">
+                            <div className="flex w-full items-center justify-center gap-1 whitespace-nowrap">
                                 <User className="w-3 h-3" />
                                 {'\u0417\u0430\u043a\u0430\u0437\u0430\u043b'}
                             </div>

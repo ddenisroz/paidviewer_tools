@@ -545,7 +545,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                     </CardContent>
                 </Card>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 min-[1280px]:gap-4">
                     {filteredRedemptions.map((demand, index) => {
                         const rewardData = rewardsMap.get(demand.reward?.id || '');
                         const rewardTitle = rewardData?.name || rewardData?.title || 'Неизвестная награда';
@@ -938,7 +938,7 @@ const PointsManagementPage: React.FC = () => {
                                     </CardContent>
                                 </Card>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-3 min-[1280px]:gap-4">
                                     {rewards.map((reward) => (
                                         <RewardCard
                                             key={reward.id}

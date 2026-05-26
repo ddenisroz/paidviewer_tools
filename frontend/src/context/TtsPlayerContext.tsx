@@ -7,7 +7,7 @@ import { logger } from '@/shared/utils/prodLogger';
 import { resolveAudioUrl as resolveBackendAudioUrl } from '@/shared/utils/urlUtils';
 import { getChatWebSocketToken } from '@/shared/utils/websocketAuth';
 
-import { useAuth } from './AuthContext';
+import { AuthContext } from './AuthContext';
 
 interface TtsQueueItem {
     id: string;
@@ -152,7 +152,9 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     const playNextRef = useRef<(() => void) | null>(null);
     const retryCount = useRef<number>(0);
     const MAX_RETRIES = 3;
-    const { isAuthenticated, user } = useAuth();
+    const authContext = useContext(AuthContext);
+    const isAuthenticated = Boolean(authContext?.isAuthenticated);
+    const user = authContext?.user ?? null;
 
     const invalidatePlaybackRequests = useCallback(() => {
         playbackRequestIdRef.current += 1;

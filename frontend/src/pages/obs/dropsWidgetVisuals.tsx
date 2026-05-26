@@ -46,14 +46,14 @@ export const DropsWidgetPreviewPanel: React.FC<{
 export const DropsWidgetOpeningStage: React.FC<{ quality: string; viewerName?: string }> = ({ quality }) => {
     const lootbox = getLootboxImages(quality);
     return (
-        <div className="relative flex h-[320px] items-center justify-center">
-            <div className={`absolute top-2 rounded-full border px-4 py-1.5 text-sm font-black uppercase tracking-[0.18em] ${qualityTone(quality)}`}>
+        <div className="relative flex h-[300px] items-center justify-center">
+            <div className={`absolute top-0 rounded-full border px-4 py-1.5 text-sm font-black uppercase tracking-[0.18em] ${qualityTone(quality)}`}>
                 {qualityLabel(quality)}
             </div>
             <img
                 src={lootbox.closed}
                 alt=""
-                className="h-56 w-56 object-contain drop-shadow-[0_26px_46px_rgba(0,0,0,0.55)]"
+                className="h-60 w-60 object-contain drop-shadow-[0_28px_42px_rgba(0,0,0,0.55)]"
             />
         </div>
     );
@@ -70,18 +70,17 @@ export const DropsWidgetReelStage: React.FC<{
     const chestImage = phase === 'result' ? lootbox.opened : lootbox.closed;
 
     return (
-        <div className="relative h-[340px] overflow-hidden">
+        <div className="relative h-[350px] overflow-hidden">
             <div className={`pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 rounded-full border px-4 py-1.5 text-sm font-black uppercase tracking-[0.18em] ${qualityTone(quality)}`}>
                 {qualityLabel(quality)}
             </div>
             <img
                 src={chestImage}
                 alt=""
-                className="pointer-events-none absolute left-1/2 top-[44px] z-0 h-64 w-64 -translate-x-1/2 object-contain opacity-95 drop-shadow-[0_30px_55px_rgba(0,0,0,0.6)]"
+                className="pointer-events-none absolute left-1/2 top-[36px] z-0 h-64 w-64 -translate-x-1/2 object-contain opacity-95 drop-shadow-[0_30px_55px_rgba(0,0,0,0.6)]"
             />
-            <div className={`pointer-events-none absolute inset-x-0 top-[134px] h-[132px] bg-gradient-to-r ${qualityGlowClass(quality)} opacity-70 blur-2xl`} />
             <div
-                className="absolute left-0 top-[118px] z-10 flex items-stretch gap-4"
+                className="absolute left-0 top-[122px] z-10 flex items-stretch gap-4"
                 style={{ transform: translateX, willChange: 'transform' }}
             >
                 {reelItems.map((item, index) => {
@@ -89,9 +88,9 @@ export const DropsWidgetReelStage: React.FC<{
                     return (
                         <div
                             key={item.id}
-                            className={`flex h-[176px] w-[188px] shrink-0 flex-col items-center justify-center rounded-2xl border bg-[#070b13e8] shadow-[0_18px_40px_rgba(0,0,0,0.45)] transition-all duration-300 ${
+                            className={`flex h-[168px] w-[184px] shrink-0 flex-col items-center justify-center rounded-2xl border bg-[#080a10f2] shadow-[0_18px_40px_rgba(0,0,0,0.45)] transition-all duration-300 ${
                                 isWinner
-                                    ? 'scale-105 border-amber-300 shadow-[0_0_72px_rgba(251,191,36,0.36)]'
+                                    ? 'scale-105 border-amber-300 shadow-[0_0_68px_rgba(251,191,36,0.42)]'
                                     : 'border-white/10'
                             }`}
                         >
@@ -112,12 +111,12 @@ export const DropsWidgetReelStage: React.FC<{
 export const DropsWidgetResultPanel: React.FC<{ reward: DropsWidgetRewardDataVisual; quality: string }> = ({ reward, quality }) => {
     const lootbox = getLootboxImages(quality);
     return (
-        <div className="pointer-events-none mx-auto mt-2 flex max-w-[640px] flex-col items-center text-center text-white">
-            <img src={lootbox.opened} alt="" className="h-32 w-32 object-contain drop-shadow-[0_22px_42px_rgba(0,0,0,0.5)]" />
-            <div className={`mt-2 rounded-full border px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] ${qualityTone(quality)}`}>
+        <div className="pointer-events-none mx-auto mt-1 flex max-w-[620px] flex-col items-center text-center text-white">
+            <img src={lootbox.opened} alt="" className="h-28 w-28 object-contain drop-shadow-[0_22px_42px_rgba(0,0,0,0.5)]" />
+            <div className={`mt-1.5 rounded-full border px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] ${qualityTone(quality)}`}>
                 {qualityLabel(quality)}
             </div>
-            <div className="mt-3 rounded-2xl border border-white/10 bg-[#080d16e6] px-6 py-4 text-3xl font-black shadow-[0_24px_70px_rgba(0,0,0,0.42)]">
+            <div className="mt-2 px-6 py-2 text-3xl font-black drop-shadow-[0_10px_18px_rgba(0,0,0,0.75)]">
                 {reward.reward_name || 'Награда'}
             </div>
             {reward.description ? <p className="mt-2 max-w-[560px] text-sm font-semibold text-white/75">{reward.description}</p> : null}

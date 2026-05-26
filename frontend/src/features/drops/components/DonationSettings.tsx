@@ -314,7 +314,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
 
                 {formData.mythical_enabled && (
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-2 gap-3 min-[1280px]:gap-4">
                             <MythicalControl
                                 label="Мин. интервал"
                                 unit="ч"

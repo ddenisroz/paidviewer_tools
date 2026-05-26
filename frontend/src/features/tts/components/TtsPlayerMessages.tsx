@@ -41,10 +41,10 @@ export const TtsPlayerMessages: React.FC<{ compact: boolean; messages: TtsPlayer
         className={
             compact
                 ? 'card-glass flex min-h-0 flex-col border-border/70'
-                : 'card-glass flex min-h-0 max-h-[min(500px,calc(100vh-170px))] flex-1 flex-col border-border/70'
+                : 'card-glass flex min-h-0 max-h-[min(430px,calc(100vh-160px))] flex-1 flex-col border-border/70'
         }
     >
-        <CardHeader className="border-b border-white/5 px-4 py-3">
+        <CardHeader className="border-b border-white/5 px-4 py-2.5">
             <CardTitle className="text-base">Голоса озвучки</CardTitle>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 p-2">
@@ -53,7 +53,7 @@ export const TtsPlayerMessages: React.FC<{ compact: boolean; messages: TtsPlayer
                     Жду сообщения
                 </div>
             ) : (
-                <div className="h-full min-h-[180px] overflow-y-auto rounded-md border border-white/10 bg-background/45 px-2 py-1 custom-scrollbar">
+                <div className="h-full min-h-0 overflow-y-auto rounded-md border border-white/10 bg-background/45 px-2 py-1 custom-scrollbar">
                     {messages.map((message) => (
                         <TtsPlayerMessageRow
                             key={message.id}

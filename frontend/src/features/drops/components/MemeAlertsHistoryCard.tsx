@@ -44,7 +44,7 @@ export const MemeAlertsHistoryCard: React.FC<MemeAlertsHistoryCardProps> = ({
     };
 
     return (
-        <Card className={`${SURFACE_CARD_CLASS} flex h-[460px] min-w-0 flex-col xl:w-[380px]`}>
+        <Card className={`${SURFACE_CARD_CLASS} flex h-[460px] w-full min-w-0 flex-col`}>
             <Tabs
                 value={activeTab}
                 onValueChange={(value) => {
