@@ -20,6 +20,12 @@ CANONICAL_REWARD_KEYS = (
     "requests_reward_vk_id",
 )
 
+DONATIONALERTS_VIDEO_KEYS = (
+    "donationalerts_video_enabled",
+    "donationalerts_video_min_amount",
+    "donationalerts_video_priority_next",
+)
+
 
 def clean_optional_reward_value(value: object) -> Optional[str]:
     """Normalize reward identifiers/titles coming from API payloads or DB JSON."""
@@ -123,6 +129,9 @@ def build_youtube_settings_response(youtube_settings: Mapping[str, Any] | None) 
         "obs_overlay_mode": normalize_obs_overlay_mode(canonical.get("obs_overlay_mode", "track")),
         "volume_level": canonical.get("volume_level", 100),
         "requests_command_enabled": canonical.get("requests_command_enabled", True),
+        "donationalerts_video_enabled": bool(canonical.get("donationalerts_video_enabled", False)),
+        "donationalerts_video_min_amount": float(canonical.get("donationalerts_video_min_amount", 0) or 0),
+        "donationalerts_video_priority_next": bool(canonical.get("donationalerts_video_priority_next", True)),
         **reward_settings,
     }
 
@@ -190,6 +199,9 @@ def apply_youtube_settings_update(
             "requests_reward_twitch_id": reward_view["requests_reward_twitch_id"],
             "requests_reward_vk_enabled": reward_view["requests_reward_vk_enabled"],
             "requests_reward_vk_id": reward_view["requests_reward_vk_id"],
+            "donationalerts_video_enabled": bool(merged.get("donationalerts_video_enabled", False)),
+            "donationalerts_video_min_amount": max(0.0, float(merged.get("donationalerts_video_min_amount", 0) or 0)),
+            "donationalerts_video_priority_next": bool(merged.get("donationalerts_video_priority_next", True)),
         }
     )
     return canonicalize_youtube_settings(merged)

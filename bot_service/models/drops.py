@@ -88,7 +88,7 @@ class DropsConfig(Base):
     mythical_last_appeared = Column(DateTime, nullable=True)
 
     # Widget (OBS animation) settings.
-    widget_spinning_duration_ms = Column(Integer, default=1500)
+    widget_spinning_duration_ms = Column(Integer, default=5000)
     widget_opening_duration_ms = Column(Integer, default=1000)
     widget_result_duration_ms = Column(Integer, default=5500)
     widget_closing_duration_ms = Column(Integer, default=500)

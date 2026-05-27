@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import MessageContent from '@/features/chat/components/MessageContent';
 import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
 import { CHATBOX_BRAND_FONT } from '@/features/chatbox/constants/fontOptions';
-import { loadGoogleFont, normalizeChatBoxSettings } from '@/features/chatbox/utils/chatboxHelpers';
+import { loadGoogleFont, normalizeChatBoxSettings, resolveMessageBackgroundMode } from '@/features/chatbox/utils/chatboxHelpers';
 import { chatboxService } from '@/services/api/services/chatboxService';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
@@ -86,6 +86,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
             (settings?.show_badges && msg.platform === 'vk' && msg.role)
         );
         const usernameColor = settings.username_color || (msg.platform === 'twitch' ? '#9146FF' : '#FF4444');
+        const messageBackgroundMode = resolveMessageBackgroundMode(settings);
 
         const messageStyle = useMemo(() => {
             const resolvedFontFamily = settings?.font_family
@@ -94,7 +95,9 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
                     : `${settings.font_family}, sans-serif`
                 : undefined;
             const messageBackground =
-                (settings?.background_opacity ?? 0) > 0
+                messageBackgroundMode !== 'message'
+                    ? 'transparent'
+                    : (settings?.background_opacity ?? 0) > 0
                     ? toRgba(settings?.background_color || '#000000', settings?.background_opacity ?? 0.5)
                     : 'transparent';
             const baseFontSize = settings?.font_size || 16;
@@ -113,6 +116,10 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
                 maxWidth: settings.chat_direction === 'horizontal' ? '600px' : 'auto',
                 padding: settings.chat_direction === 'horizontal' ? '6px 10px' : '4px 8px',
                 backgroundColor: messageBackground,
+                boxShadow:
+                    messageBackgroundMode === 'message' && messageBackground !== 'transparent'
+                        ? 'inset 0 0 0 1px rgba(255,255,255,0.06), 0 8px 20px rgba(0,0,0,0.18)'
+                        : 'none',
                 lineHeight: 1.25,
                 display: settings.chat_direction === 'horizontal' ? 'block' : 'flex',
                 alignItems: settings.chat_direction === 'horizontal' ? 'initial' : 'center',
@@ -154,7 +161,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
             }
 
             return baseStyle;
-        }, [isNewMessage, settings, index]);
+        }, [isNewMessage, settings, index, messageBackgroundMode]);
 
         return (
             <div key={messageId} style={messageStyle}>
@@ -268,23 +275,6 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
                         verticalAlign: 'baseline',
                     }}
                 >
-                    {settings?.show_avatars && msg.avatar_url && (
-                        <img
-                            src={msg.avatar_url}
-                            alt={msg.author_name || msg.author || 'avatar'}
-                            style={{
-                                width: `${Math.max(14, Math.min(24, (settings?.font_size || 16) * 1.15))}px`,
-                                height: `${Math.max(14, Math.min(24, (settings?.font_size || 16) * 1.15))}px`,
-                                borderRadius: '999px',
-                                display: 'inline-block',
-                                verticalAlign: 'text-bottom',
-                                marginRight: '6px',
-                            }}
-                            onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                        />
-                    )}
                     <span
                         onClick={(e) => onNicknameClick(e, msg.author_name || msg.author || 'Unknown', msg.platform)}
                         style={{
@@ -339,6 +329,8 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
             prevProps.settings.show_badges === nextProps.settings.show_badges &&
             prevProps.settings.show_links === nextProps.settings.show_links &&
             prevProps.settings.show_7tv_emotes === nextProps.settings.show_7tv_emotes &&
+            prevProps.settings.separate_message_backgrounds === nextProps.settings.separate_message_backgrounds &&
+            prevProps.settings.message_background_mode === nextProps.settings.message_background_mode &&
             prevProps.settings.auto_load_images === nextProps.settings.auto_load_images &&
             prevProps.emotes.channelEmotes === nextProps.emotes.channelEmotes &&
             prevProps.emotes.globalEmotes === nextProps.emotes.globalEmotes
@@ -393,6 +385,11 @@ const ChatOverlay: React.FC = () => {
             boxSizing: 'border-box',
         };
     }, [settings]);
+
+    const messageBackgroundMode = useMemo(
+        () => (settings ? resolveMessageBackgroundMode(settings) : 'message'),
+        [settings]
+    );
 
     useEffect(() => {
         const style = document.createElement('style');
@@ -610,6 +607,20 @@ const ChatOverlay: React.FC = () => {
                         animation_duration: animationDuration,
                         chat_width: chatWidth,
                         border_radius: borderRadius,
+                        message_background_mode:
+                            resolveMessageBackgroundMode({
+                                message_background_mode:
+                                    updateData?.message_background_mode ?? prevSettings.message_background_mode,
+                                separate_message_backgrounds:
+                                    updateData?.separate_message_backgrounds ?? prevSettings.separate_message_backgrounds,
+                            }),
+                        separate_message_backgrounds:
+                            resolveMessageBackgroundMode({
+                                message_background_mode:
+                                    updateData?.message_background_mode ?? prevSettings.message_background_mode,
+                                separate_message_backgrounds:
+                                    updateData?.separate_message_backgrounds ?? prevSettings.separate_message_backgrounds,
+                            }) === 'message',
                     };
 
                     return updatedSettings;
@@ -992,7 +1003,28 @@ const ChatOverlay: React.FC = () => {
                             overflowY: settings.chat_direction === 'horizontal' ? 'hidden' : 'auto',
                             alignItems: settings.chat_direction === 'horizontal' ? 'center' : 'stretch',
                             gap: settings.chat_direction === 'horizontal' ? '8px' : '0',
-                            paddingBottom: '0',
+                            paddingTop: settings.chat_direction === 'horizontal' ? '0' : `${Math.max(6, settings.message_spacing || 0)}px`,
+                            paddingBottom:
+                                settings.chat_direction === 'horizontal'
+                                    ? '0'
+                                    : `${Math.max(14, (settings.font_size || 16) * 1.15)}px`,
+                            boxSizing: 'border-box',
+                            backgroundColor:
+                                messageBackgroundMode === 'column'
+                                    ? toRgba(settings.background_color || '#000000', settings.background_opacity ?? 0.5)
+                                    : 'transparent',
+                            borderRadius:
+                                messageBackgroundMode === 'column' ? `${settings.border_radius ?? 8}px` : '0',
+                            boxShadow:
+                                messageBackgroundMode === 'column'
+                                    ? 'inset 0 0 0 1px rgba(255,255,255,0.06), 0 10px 24px rgba(0,0,0,0.18)'
+                                    : 'none',
+                            paddingLeft: messageBackgroundMode === 'column' ? '8px' : '0',
+                            paddingRight: messageBackgroundMode === 'column' ? '8px' : '0',
+                            scrollPaddingBlockEnd:
+                                settings.chat_direction === 'horizontal'
+                                    ? undefined
+                                    : `${Math.max(14, (settings.font_size || 16) * 1.15)}px`,
                         }}
                     >
                         {settings.chat_direction !== 'horizontal' && <div style={{ flexGrow: 1 }} />}

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 
 import { dropsService } from '@/services/api/services/dropsService';
 import { logger } from '@/shared/utils/prodLogger';
@@ -78,6 +78,7 @@ interface ReelItem {
     id: string;
     quality: string;
     reward?: Reward;
+    dropChance?: number;
 }
 
 type AnimationPhase = 'idle' | 'opening' | 'spinning' | 'result';
@@ -96,6 +97,7 @@ const CARD_GAP = 16;
 const CARD_STEP = CARD_WIDTH + CARD_GAP;
 const WINNER_SLOT_INDEX = 26;
 const REEL_LENGTH = 38;
+const PREVIEW_QUALITIES = new Set(['common', 'rare', 'epic', 'legendary', 'mythical']);
 
 const weightedPick = (rewards: Reward[]): Reward | null => {
     if (rewards.length === 0) return null;
@@ -112,11 +114,11 @@ const clamp = (value: number, min: number, max: number): number => Math.max(min,
 
 const DropsWidget: React.FC = () => {
     const { token } = useParams<{ token: string }>();
+    const location = useLocation();
     const [currentReward, setCurrentReward] = useState<RewardData | null>(null);
     const [reelItems, setReelItems] = useState<ReelItem[]>([]);
     const [previewRewards, setPreviewRewards] = useState<Reward[]>([]);
     const [phase, setPhase] = useState<AnimationPhase>('idle');
-    const [isPreviewMode, setIsPreviewMode] = useState(false);
     const [, setStatus] = useState('Подключение...');
     const [translateX, setTranslateX] = useState('translate3d(0px, 0, 0)');
     const [pointerKick, setPointerKick] = useState(false);
@@ -125,7 +127,7 @@ const DropsWidget: React.FC = () => {
 
     const ws = useRef<WebSocket | null>(null);
     const widgetConfig = useRef<WidgetConfig>({
-        spinning_duration: 1800,
+        spinning_duration: 5000,
         opening_duration: 700,
         result_duration: 5000,
         spin_sound_file: null,
@@ -141,7 +143,9 @@ const DropsWidget: React.FC = () => {
     const lastTickSlotRef = useRef<number>(-1);
     const autoPreviewStartedRef = useRef(false);
 
-    const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
+    const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+    const isPreviewMode = searchParams.get('preview') === 'true';
+    const previewQuality = (searchParams.get('quality') || '').toLowerCase();
     const idleBackground = searchParams.get('background') === 'green' ? 'bg-[#00ff00]' : 'bg-transparent';
 
     const clearAnimations = useCallback(() => {
@@ -313,12 +317,16 @@ const DropsWidget: React.FC = () => {
             };
 
             const fillerPool = rewardPool.length > 0 ? rewardPool : [fallbackReward];
+            const totalWeight = fillerPool.reduce((sum, r) => sum + Math.max(1, Number(r.weight) || 1), 0);
             const strip = Array.from({ length: REEL_LENGTH }, (_, index) => {
                 const reward = index === WINNER_SLOT_INDEX ? winnerReward : weightedPick(fillerPool) || winnerReward;
+                const rewardWeight = Math.max(1, Number(reward.weight) || 1);
+                const dropChance = totalWeight > 0 ? (rewardWeight / totalWeight) * 100 : 0;
                 return {
                     id: `${reward.id}-${index}`,
                     quality: (reward.quality?.name || quality).toLowerCase(),
                     reward,
+                    dropChance,
                 } satisfies ReelItem;
             });
 
@@ -423,7 +431,7 @@ const DropsWidget: React.FC = () => {
                 const configData = configResponse.data as DropsApiResponse<WidgetConfigData>;
                 if (configData.success && configData.data) {
                     widgetConfig.current = {
-                        spinning_duration: configData.data.widget_spinning_duration_ms || 1800,
+                        spinning_duration: configData.data.widget_spinning_duration_ms || 5000,
                         opening_duration: configData.data.widget_opening_duration_ms || 700,
                         result_duration: configData.data.widget_result_duration_ms || 5000,
                         spin_sound_file: configData.data.widget_spin_sound_file || null,
@@ -442,8 +450,8 @@ const DropsWidget: React.FC = () => {
     }, [loadMythicalSession, loadPreviewRewards, token]);
 
     useEffect(() => {
-        setIsPreviewMode(searchParams.get('preview') === 'true');
-    }, [searchParams]);
+        autoPreviewStartedRef.current = false;
+    }, [isPreviewMode, previewQuality, token]);
 
     useEffect(() => {
         if (!token) {
@@ -535,15 +543,14 @@ const DropsWidget: React.FC = () => {
     const currentQuality = (currentReward?.quality || currentReward?.quality_name || 'common').toLowerCase();
     useEffect(() => {
         if (!isPreviewMode || autoPreviewStartedRef.current || phase !== 'idle') return;
-        const quality = (searchParams.get('quality') || '').toLowerCase();
-        if (!['common', 'rare', 'epic', 'legendary', 'mythical'].includes(quality)) return;
+        if (!PREVIEW_QUALITIES.has(previewQuality)) return;
 
         const timer = window.setTimeout(() => {
             autoPreviewStartedRef.current = true;
-            void triggerPreviewChest(quality);
+            void triggerPreviewChest(previewQuality);
         }, 350);
         return () => window.clearTimeout(timer);
-    }, [isPreviewMode, phase, searchParams, triggerPreviewChest]);
+    }, [isPreviewMode, phase, previewQuality, triggerPreviewChest]);
 
     if (mythicalSession && mythicalTimer !== null && mythicalTimer > 0) {
         return (
@@ -559,11 +566,11 @@ const DropsWidget: React.FC = () => {
     }
 
     if (phase === 'idle' || !currentReward) {
-        return <div className={`fixed inset-0 ${idleBackground}`} />;
+        return <div className={`fixed inset-0 ${idleBackground}`} data-drops-phase="idle" />;
     }
 
     return (
-        <div className={`fixed inset-0 overflow-hidden ${idleBackground}`}>
+        <div className={`fixed inset-0 overflow-hidden ${idleBackground}`} data-drops-phase={phase}>
             <style>
                 {`
                     @keyframes dropsPointerTick {
@@ -571,16 +578,20 @@ const DropsWidget: React.FC = () => {
                         35% { transform: translateX(-50%) rotate(11deg); }
                         70% { transform: translateX(-50%) rotate(-7deg); }
                     }
+                    @keyframes dropsChestPulse {
+                        0%, 100% { transform: translateX(-50%) scale(1); filter: brightness(1); }
+                        50% { transform: translateX(-50%) scale(1.035); filter: brightness(1.12); }
+                    }
                 `}
             </style>
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
                 <div className="relative mx-auto w-full max-w-[1120px] px-8">
                     <div
-                        className={`pointer-events-none absolute left-1/2 top-[86px] z-40 h-0 w-0 -translate-x-1/2 border-l-[18px] border-r-[18px] border-t-[26px] border-l-transparent border-r-transparent border-t-amber-300 drop-shadow-[0_8px_16px_rgba(251,191,36,0.62)] ${
+                        className={`pointer-events-none absolute left-1/2 top-[224px] z-40 h-0 w-0 -translate-x-1/2 border-l-[18px] border-r-[18px] border-t-[26px] border-l-transparent border-r-transparent border-t-amber-300 drop-shadow-[0_8px_16px_rgba(251,191,36,0.62)] ${
                             pointerKick ? '[animation:dropsPointerTick_120ms_ease-out]' : ''
                         }`}
                     />
-                    <div className="pointer-events-none absolute left-1/2 top-[110px] z-30 h-[210px] w-[3px] -translate-x-1/2 bg-gradient-to-b from-amber-200 via-amber-300 to-transparent opacity-80" />
+                    <div className="pointer-events-none absolute left-1/2 top-[250px] z-30 h-[170px] w-[3px] -translate-x-1/2 bg-gradient-to-b from-amber-200 via-amber-300 to-transparent opacity-80" />
 
                     {phase === 'opening' ? (
                         <DropsWidgetOpeningStage quality={currentQuality} viewerName={currentReward.viewer_name} />

@@ -18,6 +18,8 @@ const ObsTtsPage: React.FC = () => {
     const [status, setStatus] = useState(token ? 'connecting' : 'missing token');
     const ws = useRef<WebSocket | null>(null);
     const reconnectTimerRef = useRef<number | null>(null);
+    const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+    const playbackEnabledRef = useRef(true);
 
     useEffect(() => {
         const root = document.getElementById('root');
@@ -65,10 +67,12 @@ const ObsTtsPage: React.FC = () => {
                         data?: {
                             audio_url?: string;
                             source_message_id?: string;
+                            command?: string;
                         };
                         audio_url?: string;
                         source_message_id?: string;
                         message?: string;
+                        command?: string;
                     };
 
                     const payload = message.data || message;
@@ -83,6 +87,33 @@ const ObsTtsPage: React.FC = () => {
                             },
                         ]);
                         setStatus('queued');
+                    } else if (message.type === 'tts_control') {
+                        const command = String(message.command || payload.command || '').trim().toLowerCase();
+                        if (command === 'start') {
+                            playbackEnabledRef.current = true;
+                            setStatus('connected');
+                            setIsPlaying(false);
+                            setAudioQueue((prevQueue) => [...prevQueue]);
+                        } else if (command === 'stop') {
+                            playbackEnabledRef.current = false;
+                            currentAudioRef.current?.pause();
+                            currentAudioRef.current = null;
+                            setIsPlaying(false);
+                            setStatus('stopped');
+                        } else if (command === 'skip') {
+                            currentAudioRef.current?.pause();
+                            currentAudioRef.current = null;
+                            setIsPlaying(false);
+                            setAudioQueue((prevQueue) => prevQueue.slice(1));
+                            setStatus('connected');
+                        } else if (command === 'clear') {
+                            playbackEnabledRef.current = true;
+                            currentAudioRef.current?.pause();
+                            currentAudioRef.current = null;
+                            setIsPlaying(false);
+                            setAudioQueue([]);
+                            setStatus('connected');
+                        }
                     } else if (message.type === 'tts_error') {
                         setStatus(message.message || 'tts error');
                     }
@@ -112,10 +143,11 @@ const ObsTtsPage: React.FC = () => {
     }, [token]);
 
     useEffect(() => {
-        if (audioQueue.length === 0 || isPlaying) return;
+        if (audioQueue.length === 0 || isPlaying || !playbackEnabledRef.current) return;
 
         const nextItem = audioQueue[0];
         const audio = new Audio(nextItem.audioUrl);
+        currentAudioRef.current = audio;
         audio.preload = 'auto';
         setIsPlaying(true);
         setStatus('playing');
@@ -134,6 +166,9 @@ const ObsTtsPage: React.FC = () => {
         sendPlaybackStatus('playing');
 
         const finish = (statusValue: 'played' | 'failed' = 'played'): void => {
+            if (currentAudioRef.current === audio) {
+                currentAudioRef.current = null;
+            }
             setIsPlaying(false);
             setAudioQueue((prevQueue) => prevQueue.slice(1));
             setStatus('connected');

@@ -15,6 +15,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { SliderWithInput } from '@/shared/components/ui/slider-with-input';
 import { useAutoSave } from '@/shared/hooks/useAutoSave';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
@@ -46,7 +47,7 @@ const areDurationsEqual = (left: FormData, right: FormData): boolean =>
 
 const getWidgetFormData = (config: Partial<DropsConfig> | null | undefined): FormData => ({
     widget_spinning_duration_ms: clampDuration(
-        config?.widget_spinning_duration_ms ?? 1500,
+        config?.widget_spinning_duration_ms ?? 5000,
         500,
         DROPS_CONSTANTS.WIDGET.MAX_SPINNING_MS
     ),
@@ -68,6 +69,7 @@ const PREVIEW_QUALITIES = [
 
 const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) => {
     const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
+    const [selectedPreviewQuality, setSelectedPreviewQuality] = useState<(typeof PREVIEW_QUALITIES)[number]['value']>('common');
 
     const { data: config } = useDropsConfig(channelName, {
         enabled: !!user && !!channelName,
@@ -85,7 +87,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     const sendTestEventMutation = useSendDropsWidgetTestEvent(channelName);
 
     const [formData, setFormData] = useState<FormData>({
-        widget_spinning_duration_ms: 1500,
+        widget_spinning_duration_ms: 5000,
         widget_result_duration_ms: 5500,
         widget_sound_volume: 1,
     });
@@ -297,23 +299,37 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                             </div>
 
                             <div className="flex flex-wrap gap-2">
-                                {PREVIEW_QUALITIES.map((quality) => (
-                                    <Button
-                                        key={quality.value}
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => sendTestEventMutation.mutate(quality.value)}
-                                        disabled={sendTestEventMutation.isPending}
-                                        className={ACTION_CLASS}
-                                    >
-                                        {sendTestEventMutation.isPending ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <TestTube2 className="h-4 w-4" />
-                                        )}
-                                        {quality.label}
-                                    </Button>
-                                ))}
+                                <Select
+                                    value={selectedPreviewQuality}
+                                    onValueChange={(value) =>
+                                        setSelectedPreviewQuality(value as (typeof PREVIEW_QUALITIES)[number]['value'])
+                                    }
+                                >
+                                    <SelectTrigger className="h-9 w-[210px] border-border/70 bg-transparent">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {PREVIEW_QUALITIES.map((quality) => (
+                                            <SelectItem key={quality.value} value={quality.value}>
+                                                {quality.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => sendTestEventMutation.mutate(selectedPreviewQuality)}
+                                    disabled={sendTestEventMutation.isPending}
+                                    className={ACTION_CLASS}
+                                >
+                                    {sendTestEventMutation.isPending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <TestTube2 className="h-4 w-4" />
+                                    )}
+                                    Test
+                                </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"

@@ -93,6 +93,19 @@ class UserRepository(BaseRepository[User]):
             self.db.commit()
             return user
         return None
+
+    def update_tts_obs_token(self, user_id: int, field_name: str, token: str) -> Optional[User]:
+        """Update one of the dedicated TTS OBS tokens."""
+        if field_name not in {"tts_dock_token", "tts_source_token"}:
+            raise ValueError("Unsupported TTS OBS token field")
+
+        user = self.get_by_id(user_id)
+        if user:
+            setattr(user, field_name, token)
+            self.db.commit()
+            self.db.refresh(user)
+            return user
+        return None
     
     def create_with_obs_token(self, user_id: int, obs_token: str) -> User:
         """Create a new user with OBS token."""

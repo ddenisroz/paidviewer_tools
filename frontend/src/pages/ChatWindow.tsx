@@ -45,7 +45,6 @@ const DEFAULT_CHAT_SETTINGS: ChatWindowSettings = {
     show_links: true,
     auto_load_images: true,
     show_roles: false,
-    show_avatars: false,
     font_weight: 'normal',
     text_stroke_width: 0,
     text_stroke_color: '#000000',

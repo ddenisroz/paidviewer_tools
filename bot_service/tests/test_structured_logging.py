@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from core import structured_logging
+from services.tts_handler_service import _safe_log_text_preview
 
 
 def _workspace_log_path() -> Path:
@@ -44,3 +45,11 @@ def test_create_file_log_handler_uses_rotation_outside_windows_dev(monkeypatch):
             log_path.unlink(missing_ok=True)
         except PermissionError:
             pass
+
+
+def test_safe_log_text_preview_escapes_cyrillic_without_losing_content():
+    preview = _safe_log_text_preview("ёжик привет", limit=6)
+
+    assert "\\u0451" in preview
+    assert "\\u0436" in preview
+    assert preview.endswith("...")

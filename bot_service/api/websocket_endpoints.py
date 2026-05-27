@@ -8,7 +8,7 @@ Moved out of main.py to improve modularity.
 import json
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterable
 
 from fastapi import APIRouter, WebSocket, HTTPException
 
@@ -142,14 +142,7 @@ async def _resolve_authenticated_user_id(websocket: WebSocket) -> Optional[int]:
         presence_only_raw = websocket.query_params.get("presence_only")
         presence_only = str(presence_only_raw).strip().lower() in {"1", "true", "yes", "on"}
         if client_role == "tts_player" and presence_only:
-            try:
-                payload = verify_jwt_token(obs_token, expected_type="obs")
-                raw_user_id = payload.get("user_id")
-                user_id = int(raw_user_id) if raw_user_id else 0
-                if user_id > 0:
-                    return user_id
-            except Exception:
-                return None
+            return _resolve_jwt_token_user_id(obs_token, ("tts_dock", "obs"))
 
     session_id = websocket.cookies.get("session_id")
     if not session_id:
@@ -293,6 +286,10 @@ async def _run_chat_connection(
                 await manager.handle_ping(conn_id)
                 continue
 
+            if client_role == "tts_player" and message.get("type") == "tts_control":
+                await _send_tts_control_to_source(user_id_int, str(message.get("command") or ""))
+                continue
+
             # Keep non-heartbeat client chatter out of warning/error logs.
             msg_type = message.get("type", "unknown")
             if msg_type != "pong":
@@ -424,13 +421,60 @@ async def websocket_drops_widget(websocket: WebSocket, token: str):
     )
 
 
+def _resolve_jwt_token_user_id(token: str, expected_types: Iterable[str]) -> Optional[int]:
+    for expected_type in expected_types:
+        try:
+            payload = verify_jwt_token(token, expected_type=expected_type)
+            user_id = payload.get("user_id")
+            parsed_user_id = int(user_id) if user_id else 0
+            if parsed_user_id > 0:
+                return parsed_user_id
+        except (HTTPException, TypeError, ValueError):
+            continue
+    return None
+
+
 def _resolve_obs_token_user_id(token: str) -> Optional[int]:
-    try:
-        payload = verify_jwt_token(token, expected_type="obs")
-        user_id = payload.get("user_id")
-        return int(user_id) if user_id else None
-    except (HTTPException, TypeError, ValueError):
-        return None
+    return _resolve_jwt_token_user_id(token, ("obs",))
+
+
+def _resolve_tts_source_token_user_id(token: str) -> Optional[int]:
+    return _resolve_jwt_token_user_id(token, ("tts_source", "obs"))
+
+
+def _resolve_tts_dock_token_user_id(token: str) -> Optional[int]:
+    return _resolve_jwt_token_user_id(token, ("tts_dock", "obs"))
+
+
+async def _send_tts_control_to_source(user_id: int, command: str) -> bool:
+    normalized_command = command.strip().lower()
+    if normalized_command not in {"start", "stop", "skip", "clear"}:
+        return False
+
+    def _db_query() -> tuple[str | None, str | None]:
+        db = next(get_db())
+        try:
+            user = UserRepository(db).get_by_id(user_id)
+            if not user:
+                return None, None
+            return getattr(user, "tts_source_token", None), getattr(user, "obs_token", None)
+        finally:
+            db.close()
+
+    source_token, legacy_token = await asyncio.to_thread(_db_query)
+    connection_manager = get_connection_manager()
+    for token in (source_token, legacy_token):
+        if not token:
+            continue
+        source_socket = connection_manager.obs_connections.get(token)
+        if not source_socket:
+            continue
+        try:
+            await source_socket.send_json({"type": "tts_control", "command": normalized_command})
+            return True
+        except Exception:
+            logger.warning("[WS] Failed to relay TTS control command=%s user=%s", normalized_command, user_id)
+    return False
 
 
 async def _load_youtube_obs_state(user_id: int) -> Dict[str, Any]:
@@ -497,7 +541,7 @@ async def websocket_youtube_obs(websocket: WebSocket, token: str):
 async def websocket_tts_obs(websocket: WebSocket, token: str):
     """Public OBS browser-source websocket for TTS audio playback."""
     token_preview = (token or "")[:8]
-    user_id = _resolve_obs_token_user_id(token)
+    user_id = _resolve_tts_source_token_user_id(token)
     if not user_id:
         logger.warning("[WS] Invalid TTS OBS token %s..., closing", token_preview)
         await websocket.close(code=4401)
@@ -535,6 +579,45 @@ async def websocket_tts_obs(websocket: WebSocket, token: str):
             logger.warning("[WS] TTS OBS error for user %s: %s", user_id, exc)
     finally:
         await conn_mgr.disconnect_obs(token)
+
+
+@router.websocket("/ws/tts-dock/{token}")
+async def websocket_tts_dock(websocket: WebSocket, token: str):
+    """Public OBS dock control websocket for TTS queue controls."""
+    token_preview = (token or "")[:8]
+    user_id = _resolve_tts_dock_token_user_id(token)
+    if not user_id:
+        logger.warning("[WS] Invalid TTS dock token %s..., closing", token_preview)
+        await websocket.close(code=4401)
+        return
+
+    await websocket.accept()
+    try:
+        await websocket.send_json({"type": "tts_dock_state", "data": {"user_id": user_id}})
+        while True:
+            raw_message = await websocket.receive_text()
+            try:
+                message = json.loads(raw_message)
+            except json.JSONDecodeError:
+                continue
+
+            message_type = message.get("type")
+            if message_type == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+
+            if message_type in {"tts_control", "control"}:
+                command = str(message.get("command") or "").strip().lower()
+                relayed = await _send_tts_control_to_source(user_id, command)
+                await websocket.send_json(
+                    {"type": "tts_control_ack", "command": command, "relayed": relayed}
+                )
+    except Exception as exc:
+        exc_text = str(exc).lower()
+        if "1000" in exc_text or "1001" in exc_text or "disconnect" in exc_text or "closed" in exc_text:
+            logger.info("[WS] TTS dock disconnected cleanly: user=%s", user_id)
+        else:
+            logger.warning("[WS] TTS dock error for user %s: %s", user_id, exc)
 
 
 async def _schedule_tts_disconnect(user_id: int) -> None:

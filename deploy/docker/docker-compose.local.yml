@@ -143,6 +143,7 @@ services:
     volumes: !override
       - tts_audio:/app/audio
       - tts_cache:/app/f5_tts_cache
+      - tts_voices:/app/data/voices
 
   frontend:
     build:
@@ -176,6 +177,8 @@ volumes:
   tts_audio:
     driver: local
   tts_cache:
+    driver: local
+  tts_voices:
     driver: local
 
 networks:

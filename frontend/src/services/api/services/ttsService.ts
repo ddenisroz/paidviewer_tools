@@ -157,12 +157,20 @@ export const ttsService = {
         return apiClient.post('/api/tts/regenerate-obs-url');
     },
 
+    async regenerateObsLinks(target: 'dock' | 'source' | 'both' = 'both'): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.post('/api/tts/obs-links/regenerate', { target });
+    },
+
     /**
      * Получить OBS URL для TTS
      * @returns Promise с ответом API
      */
     async getObsUrl(): Promise<AxiosResponse<ApiResponse>> {
         return apiClient.get('/api/tts/obs-url');
+    },
+
+    async getObsLinks(): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.get('/api/tts/obs-links');
     },
 
     async getObsStatus(): Promise<AxiosResponse<ApiResponse>> {

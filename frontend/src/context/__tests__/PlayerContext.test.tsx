@@ -12,6 +12,10 @@ const { refetchQueueMock, mutateSkipMock, saveSettingsMock } = vi.hoisted(() => 
     saveSettingsMock: vi.fn(async () => undefined),
 }));
 
+const chatState = vi.hoisted(() => ({
+    lastJsonMessage: null as { type?: string } | null,
+}));
+
 vi.mock('@/queries/youtube/youtubeQueries', () => ({
     useYoutubeQueue: vi.fn(() => ({
         data: null,
@@ -33,7 +37,7 @@ vi.mock('@/context/AuthContext', () => ({
 
 vi.mock('@/context/ChatContext', () => ({
     useChat: vi.fn(() => ({
-        lastJsonMessage: null,
+        lastJsonMessage: chatState.lastJsonMessage,
         isConnected: false,
     })),
 }));
@@ -60,13 +64,14 @@ function PlayerContextProbe() {
         <>
             <div data-testid="user-paused">{String(context.userPaused)}</div>
             <div data-testid="volume">{String(context.volume)}</div>
+            <div data-testid="muted">{String(context.isMuted)}</div>
             <div data-testid="minimized">{String(context.isMinimized)}</div>
         </>
     );
 }
 
 function renderPlayerProvider() {
-    render(
+    return render(
         <MemoryRouter initialEntries={['/dashboard/youtube']}>
             <PlayerProvider>
                 <PlayerContextProbe />
@@ -81,6 +86,7 @@ function createMockPlayer() {
         playVideo: vi.fn(),
         setVolume: vi.fn(),
         getVolume: vi.fn(() => 100),
+        isMuted: vi.fn(() => false),
         mute: vi.fn(),
         unMute: vi.fn(),
         getCurrentTime: vi.fn(() => 0),
@@ -93,6 +99,7 @@ function createMockPlayer() {
 describe('PlayerContext', () => {
     beforeEach(() => {
         latestContext = null;
+        chatState.lastJsonMessage = null;
         refetchQueueMock.mockClear();
         mutateSkipMock.mockClear();
         saveSettingsMock.mockClear();
@@ -195,5 +202,56 @@ describe('PlayerContext', () => {
         expect(mockPlayer.playVideo).toHaveBeenCalled();
         expect(refetchQueueMock).toHaveBeenCalled();
         expect(window.ytUserStarted).toBe(true);
+    });
+
+    it('syncs native youtube volume and mute state back into the app controls', () => {
+        renderPlayerProvider();
+        const mockPlayer = createMockPlayer();
+
+        act(() => {
+            latestContext?.setPlayerRef(mockPlayer);
+        });
+
+        mockPlayer.getVolume.mockReturnValue(37);
+        mockPlayer.isMuted.mockReturnValue(true);
+
+        act(() => {
+            latestContext?.updateTime();
+        });
+
+        expect(screen.getByTestId('volume')).toHaveTextContent('37');
+        expect(screen.getByTestId('muted')).toHaveTextContent('true');
+    });
+
+    it('reloads queue only for the canonical youtube_queue_updated event', () => {
+        const view = renderPlayerProvider();
+
+        refetchQueueMock.mockClear();
+
+        act(() => {
+            chatState.lastJsonMessage = { type: 'youtube_queue_update' };
+        });
+        view.rerender(
+            <MemoryRouter initialEntries={['/dashboard/youtube']}>
+                <PlayerProvider>
+                    <PlayerContextProbe />
+                </PlayerProvider>
+            </MemoryRouter>
+        );
+
+        expect(refetchQueueMock).not.toHaveBeenCalled();
+
+        act(() => {
+            chatState.lastJsonMessage = { type: 'youtube_queue_updated' };
+        });
+        view.rerender(
+            <MemoryRouter initialEntries={['/dashboard/youtube']}>
+                <PlayerProvider>
+                    <PlayerContextProbe />
+                </PlayerProvider>
+            </MemoryRouter>
+        );
+
+        expect(refetchQueueMock).toHaveBeenCalledTimes(1);
     });
 });

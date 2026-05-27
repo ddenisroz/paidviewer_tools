@@ -22,7 +22,6 @@ interface QueueListProps {
 const QueueList: React.FC<QueueListProps> = ({
     queue,
     currentVideo,
-    skipVotes,
     compact = false,
     onRemove,
     onPlay,
@@ -44,8 +43,8 @@ const QueueList: React.FC<QueueListProps> = ({
                 <div
                     className={
                         compact
-                            ? 'grid grid-cols-[28px_minmax(0,1fr)_minmax(0,0.8fr)_72px] items-center gap-3 border-b border-border/70 bg-card/90 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground'
-                            : 'grid grid-cols-[28px_minmax(0,1fr)_96px_64px_72px] items-center gap-3 border-b border-border/70 bg-card/90 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground min-[1280px]:grid-cols-[28px_minmax(0,1fr)_120px_64px_72px]'
+                            ? 'grid grid-cols-[32px_minmax(0,1fr)_minmax(120px,0.8fr)_88px] items-center gap-3 border-b border-border/70 bg-card/90 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground'
+                            : 'grid grid-cols-[32px_minmax(0,1fr)_160px_96px_96px] items-center gap-3 border-b border-border/70 bg-card/90 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground'
                     }
                 >
                     <div className="text-center">#</div>
@@ -78,23 +77,13 @@ const QueueList: React.FC<QueueListProps> = ({
                         <SortableContext items={filteredQueue.map((v) => v.id)} strategy={verticalListSortingStrategy}>
                             {/* Currently Playing Section */}
                             {currentVideo && (
-                                <div className="mb-3">
-                                    <div className="px-3 py-2 text-xs font-semibold text-primary/80 uppercase tracking-widest mt-1 flex items-center justify-between">
+                            <div className="mb-3">
+                                    <div className="mt-1 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-primary/80">
                                         <span>
                                             {
                                                 '\u0421\u0435\u0439\u0447\u0430\u0441 \u0438\u0433\u0440\u0430\u0435\u0442'
                                             }
                                         </span>
-                                        {!compact &&
-                                            skipVotes &&
-                                            skipVotes.required > 1 &&
-                                            skipVotes.video_id &&
-                                            (skipVotes.video_id === currentVideo.id ||
-                                                skipVotes.video_id === currentVideo.video_id) && (
-                                                <span className="text-[10px] font-medium text-muted-foreground normal-case tracking-normal">
-                                                    {`\u0413\u043e\u043b\u043e\u0441\u0430 \u0437\u0430 \u043f\u0440\u043e\u043f\u0443\u0441\u043a: ${skipVotes.current}/${skipVotes.required}`}
-                                                </span>
-                                            )}
                                     </div>
                                     <QueueItem
                                         video={currentVideo}

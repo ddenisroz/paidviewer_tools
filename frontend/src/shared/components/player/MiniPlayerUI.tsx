@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { BarChart2, ChevronDown, List, Pause, Play, SkipForward, Trash2, Volume2, VolumeX, X } from 'lucide-react';
+import { ChevronDown, List, Pause, Play, SkipForward, Trash2, Volume2, VolumeX, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/shared/components/ui/button';
@@ -14,6 +14,9 @@ interface MiniPlayerUIProps {
     isPlaying: boolean;
     isMuted: boolean;
     volume: number;
+    currentTime?: number;
+    durationSeconds?: number;
+    skipVotes?: { current: number; required: number; video_id?: number | string | null } | null;
     queue: DisplayVideo[];
     showQueue: boolean;
     onToggleQueue: () => void;
@@ -27,12 +30,43 @@ interface MiniPlayerUIProps {
     variant?: 'floating' | 'sidebar';
 }
 
+const parseDuration = (value?: string): number => {
+    if (!value) return 0;
+    const parts = value.split(':').map((part) => Number(part));
+    if (parts.some((part) => Number.isNaN(part))) return 0;
+    return parts.reduce((total, part) => total * 60 + part, 0);
+};
+
+const formatClock = (value?: number): string => {
+    const safeValue = Math.max(0, Math.floor(Number(value) || 0));
+    const mins = Math.floor(safeValue / 60);
+    const secs = safeValue % 60;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+};
+
+const Equalizer: React.FC = () => (
+    <span className="inline-flex h-4 w-4 shrink-0 items-end justify-center gap-[2px]" title="Playing">
+        {[0, 1, 2].map((index) => (
+            <span
+                key={index}
+                className="block w-[3px] origin-bottom rounded-full bg-emerald-300"
+                style={{
+                    height: `${7 + index * 3}px`,
+                    animation: `miniEq 720ms ease-in-out ${index * 110}ms infinite alternate`,
+                }}
+            />
+        ))}
+    </span>
+);
+
 export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
     displayVideo,
     displayThumbnail,
     isPlaying,
     isMuted,
     volume,
+    currentTime = 0,
+    durationSeconds,
     queue,
     showQueue,
     onToggleQueue,
@@ -46,6 +80,11 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
     variant = 'floating',
 }) => {
     const isDocked = variant === 'sidebar';
+    const resolvedDuration = durationSeconds || parseDuration(displayVideo.duration);
+    const progress = resolvedDuration ? Math.max(0, Math.min(100, (currentTime / resolvedDuration) * 100)) : 0;
+    const requesterName = displayVideo.requester_name || displayVideo.added_by || 'Unknown';
+    const isPaidVideo = Boolean(displayVideo.is_paid || displayVideo.paid_source);
+
     return (
         <div
             className={cn(
@@ -53,9 +92,17 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
                     ? 'w-full pointer-events-auto'
                     : 'fixed bottom-4 right-4 z-40 w-[min(420px,calc(100vw-2rem))] pointer-events-auto'
             )}
+            data-mini-player-variant={variant}
         >
+            <style>
+                {`
+                    @keyframes miniEq {
+                        from { transform: scaleY(0.45); opacity: 0.62; }
+                        to { transform: scaleY(1); opacity: 1; }
+                    }
+                `}
+            </style>
             <div className="relative">
-                {/* Queue panel - floating above */}
                 {showQueue && queue.length > 0 && (
                     <QueuePanel
                         queue={queue}
@@ -65,79 +112,184 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
                     />
                 )}
 
-                {/* Main Player Card */}
-                <div className="relative overflow-hidden rounded-2xl border border-white/12 bg-[#13060d] shadow-md shadow-black/55 ring-1 ring-white/5">
-                    <div className="flex items-start p-3 gap-3">
-                        {/* Album Art / Video Thumbnail */}
-                        <ThumbnailSection
-                            thumbnail={displayThumbnail}
-                            title={displayVideo.title}
-                            isPlaying={isPlaying}
-                            onTogglePlayPause={onTogglePlayPause}
-                        />
-
-                        {/* Info & Controls */}
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                                <div className="flex min-w-0 items-center gap-2">
-                                    {isPlaying && (
-                                        <span
-                                            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300"
-                                            title="Играет"
-                                        >
-                                            <BarChart2 className="h-3 w-3 animate-pulse" />
-                                        </span>
-                                    )}
-                                    <h3
-                                        className="truncate text-sm font-medium leading-tight text-foreground"
-                                        title={displayVideo.title}
-                                    >
-                                        {displayVideo.title}
-                                    </h3>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    {queue.length > 0 && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={onToggleQueue}
-                                            className={cn(
-                                                'h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground',
-                                                showQueue && 'bg-accent/80 text-foreground'
-                                            )}
-                                            title={showQueue ? 'Скрыть очередь' : 'Показать очередь'}
-                                        >
-                                            <List className="w-4 h-4" />
-                                        </Button>
-                                    )}
+                <div
+                    className={cn(
+                        'relative overflow-hidden rounded-2xl border border-white/12 bg-[#13060d] shadow-md shadow-black/55 ring-1 ring-white/5',
+                        isDocked && 'h-[108px]'
+                    )}
+                    data-mini-player-card={variant}
+                >
+                    {isDocked ? (
+                        <div className="relative flex h-[108px] items-start gap-3 px-3 py-2.5">
+                            <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+                                {queue.length > 0 && (
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={onClose}
-                                        className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
-                                        title="Закрыть плеер"
+                                        onClick={onToggleQueue}
+                                        className={cn(
+                                            'h-5 w-5 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground',
+                                            showQueue && 'bg-accent/80 text-foreground'
+                                        )}
+                                        title="Queue"
                                     >
-                                        <X className="w-4 h-4" />
+                                        <List className="h-3 w-3" />
                                     </Button>
-                                </div>
+                                )}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onClose}
+                                    className="h-5 w-5 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                                    title="Close player"
+                                >
+                                    <X className="h-3 w-3" />
+                                </Button>
                             </div>
 
-                            <ControlsRow
-                                isMuted={isMuted}
-                                volume={volume}
-                                onNextVideo={onNextVideo}
-                                onToggleMute={onToggleMute}
-                                onVolumeChange={onVolumeChange}
-                            />
+                            <div className="flex items-start pt-0.5">
+                                <ThumbnailSection
+                                    thumbnail={displayThumbnail}
+                                    title={displayVideo.title}
+                                    isPlaying={isPlaying}
+                                    onTogglePlayPause={onTogglePlayPause}
+                                    docked
+                                />
+                            </div>
+
+                            <div className="min-w-0 flex-1 pr-8">
+                                <h3
+                                    className="text-left text-[11px] font-semibold leading-[0.95rem] text-foreground"
+                                    title={displayVideo.title}
+                                    style={{
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden',
+                                    }}
+                                >
+                                    {displayVideo.title}
+                                </h3>
+
+                                {resolvedDuration ? (
+                                    <>
+                                        <div className="mt-1 text-[10px] font-semibold text-white/70">
+                                            {formatClock(currentTime)} / {formatClock(resolvedDuration)}
+                                        </div>
+                                        <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-white/10">
+                                            <div className="h-full rounded-full bg-emerald-400" style={{ width: `${progress}%` }} />
+                                        </div>
+                                    </>
+                                ) : null}
+
+                                <div className="mt-2 flex items-center gap-1.5">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={onNextVideo}
+                                        className="h-5 w-5 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+                                        title="Next video"
+                                    >
+                                        <SkipForward className="h-3.5 w-3.5 fill-current" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={onToggleMute}
+                                        className="h-[18px] w-[18px] shrink-0 rounded-full p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                                        title={isMuted ? 'Unmute' : 'Mute'}
+                                    >
+                                        {isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                                    </Button>
+                                    <div className="min-w-0 flex-1">
+                                        <Slider
+                                            value={[isMuted ? 0 : (volume ?? 100)]}
+                                            onValueChange={onVolumeChange}
+                                            max={100}
+                                            step={1}
+                                            className="min-h-[18px] w-full"
+                                            trackClassName="h-1.5 border-white/10 bg-white/8"
+                                            rangeClassName="bg-emerald-400"
+                                            thumbClassName="h-3.5 w-3.5 border border-emerald-200 bg-emerald-400 shadow-[0_0_0_2px_rgba(16,185,129,0.12)]"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="flex items-start gap-3 p-3">
+                            <ThumbnailSection
+                                thumbnail={displayThumbnail}
+                                title={displayVideo.title}
+                                isPlaying={isPlaying}
+                                onTogglePlayPause={onTogglePlayPause}
+                            />
+
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        {isPlaying && <Equalizer />}
+                                        <h3 className="truncate text-sm font-medium leading-tight text-foreground" title={displayVideo.title}>
+                                            {displayVideo.title}
+                                        </h3>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        {queue.length > 0 && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={onToggleQueue}
+                                                className={cn(
+                                                    'h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground',
+                                                    showQueue && 'bg-accent/80 text-foreground'
+                                                )}
+                                                title="Queue"
+                                            >
+                                                <List className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={onClose}
+                                            className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                                            title="Close player"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-[11px] font-semibold text-white/62">
+                                    <span className="truncate">by {requesterName}</span>
+                                    {isPaidVideo ? (
+                                        <span className="rounded bg-amber-400/14 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-200">
+                                            Paid video
+                                        </span>
+                                    ) : null}
+                                    {resolvedDuration ? <span>{formatClock(currentTime)} / {formatClock(resolvedDuration)}</span> : null}
+                                </div>
+                                {resolvedDuration ? (
+                                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                                        <div className="h-full rounded-full bg-rose-400" style={{ width: `${progress}%` }} />
+                                    </div>
+                                ) : null}
+
+                                <ControlsRow
+                                    isMuted={isMuted}
+                                    volume={volume}
+                                    onNextVideo={onNextVideo}
+                                    onToggleMute={onToggleMute}
+                                    onVolumeChange={onVolumeChange}
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
     );
 };
-
-// Sub-components for better organization
 
 interface QueuePanelProps {
     queue: DisplayVideo[];
@@ -149,27 +301,15 @@ interface QueuePanelProps {
 const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onClose, onClearQueue, onSelectQueueItem }) => (
     <div className="pv-static-anchor-in absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl bg-[#13060d] shadow-2xl shadow-black/50 ring-1 ring-white/5">
         <div className="flex items-center justify-between border-b border-border/50 bg-[#13060d] px-4 py-3">
-            <span className="text-xs font-medium text-white/70 uppercase tracking-wider">Очередь</span>
+            <span className="text-xs font-medium uppercase tracking-wider text-white/70">Queue</span>
             <div className="flex items-center gap-1">
                 {onClearQueue && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onClearQueue}
-                        className="h-6 w-6 rounded-full p-0 hover:bg-accent/80"
-                        title="Очистить очередь"
-                    >
-                        <Trash2 className="w-4 h-4 text-muted-foreground" />
+                    <Button variant="ghost" size="sm" onClick={onClearQueue} className="h-6 w-6 rounded-full p-0 hover:bg-accent/80" title="Clear queue">
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
                     </Button>
                 )}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onClose}
-                    className="h-6 w-6 rounded-full p-0 hover:bg-accent/80"
-                    title="Скрыть"
-                >
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 rounded-full p-0 hover:bg-accent/80" title="Hide">
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </Button>
             </div>
         </div>
@@ -181,10 +321,15 @@ const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onClose, onClearQueue, o
                     className="flex w-full items-center gap-2 border-b border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent/70 last:border-0"
                     onClick={() => onSelectQueueItem?.(video)}
                 >
-                    <span className="w-4 text-right text-[10px] font-mono text-muted-foreground/60">{index + 1}</span>
+                    <span className="w-4 text-right font-mono text-[10px] text-muted-foreground/60">{index + 1}</span>
                     <p className="flex min-w-0 flex-1 items-center gap-2 text-xs font-medium text-foreground">
-                        {index === 0 && <BarChart2 className="h-3 w-3 shrink-0 animate-pulse text-emerald-300" />}
+                        {index === 0 && <Equalizer />}
                         <span className="truncate">{video.title}</span>
+                        {video.is_paid || video.paid_source ? (
+                            <span className="shrink-0 rounded bg-amber-400/14 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-200">
+                                Paid
+                            </span>
+                        ) : null}
                     </p>
                 </button>
             ))}
@@ -197,39 +342,40 @@ interface ThumbnailSectionProps {
     title: string;
     isPlaying: boolean;
     onTogglePlayPause: () => void;
+    docked?: boolean;
 }
 
-const ThumbnailSection: React.FC<ThumbnailSectionProps> = ({ thumbnail, title, isPlaying, onTogglePlayPause }) => (
-    <div className="group/thumb relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-slate-900/60 ring-1 ring-white/10 shadow-inner">
+const ThumbnailSection: React.FC<ThumbnailSectionProps> = ({ thumbnail, title, isPlaying, onTogglePlayPause, docked = false }) => (
+    <div
+        className={cn(
+            'group/thumb relative flex-shrink-0 overflow-hidden rounded-lg bg-slate-900/60 shadow-inner ring-1 ring-white/10',
+            docked ? 'h-12 w-12 rounded-md' : 'h-16 w-16'
+        )}
+    >
         {thumbnail ? (
             <img
                 src={thumbnail}
                 alt={title}
-                className={cn(
-                    'w-full h-full object-cover transition-transform duration-700',
-                    isPlaying ? 'scale-110' : 'scale-100 grayscale-[0.2]'
-                )}
+                className="h-full w-full object-cover"
             />
         ) : (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground/50">
-                <Volume2 className="w-6 h-6" />
+                <Volume2 className="h-6 w-6" />
             </div>
         )}
-        {/* Overlay Play/Pause on hover */}
-        <div
+        <button
+            type="button"
             className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover/thumb:opacity-100"
             onClick={onTogglePlayPause}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-            {isPlaying ? (
-                <Pause className="w-6 h-6 text-white fill-current" />
-            ) : (
-                <Play className="w-6 h-6 text-white fill-current" />
-            )}
-        </div>
+            {isPlaying ? <Pause className="h-6 w-6 fill-current text-white" /> : <Play className="h-6 w-6 fill-current text-white" />}
+        </button>
     </div>
 );
 
 interface ControlsRowProps {
+    docked?: boolean;
     isMuted: boolean;
     volume: number;
     onNextVideo: () => void;
@@ -237,37 +383,32 @@ interface ControlsRowProps {
     onVolumeChange: (value: number[]) => void;
 }
 
-const ControlsRow: React.FC<ControlsRowProps> = ({ isMuted, volume, onNextVideo, onToggleMute, onVolumeChange }) => (
-    <div className="mt-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1">
-            <Button
-                variant="ghost"
-                size="sm"
-                onClick={onNextVideo}
-                className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/70 hover:text-foreground"
-                title="Следующий трек"
-            >
-                <SkipForward className="w-5 h-5 fill-current" />
-            </Button>
-        </div>
+const ControlsRow: React.FC<ControlsRowProps> = ({ docked = false, isMuted, volume, onNextVideo, onToggleMute, onVolumeChange }) => (
+    <div className={cn('mt-2', docked ? 'w-full space-y-2' : 'flex items-center justify-between gap-3')}>
+        <Button
+            variant="ghost"
+            size="sm"
+            onClick={onNextVideo}
+            className={cn(
+                'rounded-full p-0 text-muted-foreground hover:bg-accent/70 hover:text-foreground',
+                docked ? 'mx-auto flex h-8 w-8' : 'h-8 w-8'
+            )}
+            title="Next video"
+        >
+            <SkipForward className="h-5 w-5 fill-current" />
+        </Button>
 
-        <div className="flex items-center gap-2 w-40">
+        <div className={cn('flex items-center gap-2', docked ? 'w-full' : 'w-40')}>
             <Button
                 variant="ghost"
                 size="sm"
                 onClick={onToggleMute}
                 className="h-7 w-7 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                title={isMuted ? 'Включить звук' : 'Выключить звук'}
+                title={isMuted ? 'Unmute' : 'Mute'}
             >
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </Button>
-            <Slider
-                value={[isMuted ? 0 : (volume ?? 100)]}
-                onValueChange={onVolumeChange}
-                max={100}
-                step={1}
-                className="w-full"
-            />
+            <Slider value={[isMuted ? 0 : (volume ?? 100)]} onValueChange={onVolumeChange} max={100} step={1} className="w-full" />
         </div>
     </div>
 );

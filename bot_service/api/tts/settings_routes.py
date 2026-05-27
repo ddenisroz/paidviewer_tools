@@ -934,11 +934,15 @@ async def get_obs_status(
     from services.memory_websocket_manager import get_memory_websocket_manager
 
     user_row = service.user_repo.get_by_id(user["id"])
-    obs_token = getattr(user_row, "obs_token", None) if user_row else None
-    source_connected = bool(obs_token and obs_token in get_connection_manager().obs_connections)
+    source_token = getattr(user_row, "tts_source_token", None) if user_row else None
+    legacy_token = getattr(user_row, "obs_token", None) if user_row else None
+    source_connected = bool(
+        (source_token and source_token in get_connection_manager().obs_connections)
+        or (legacy_token and legacy_token in get_connection_manager().obs_connections)
+    )
     dock_connected = get_memory_websocket_manager().has_user_connection_for_role(user["id"], "tts_player")
     return {
-        "has_token": bool(obs_token),
+        "has_token": bool(source_token or legacy_token),
         "source_connected": source_connected,
         "dock_connected": dock_connected,
     }

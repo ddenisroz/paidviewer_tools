@@ -3,7 +3,7 @@
 import { CHATBOX_BRAND_FONT, isBundledChatFont } from '../constants/fontOptions';
 
 import type { ApiResponse } from '@/types/api';
-import type { ChatBoxSettings } from '@/types/chatbox';
+import type { ChatBoxSettings, ChatMessageBackgroundMode } from '@/types/chatbox';
 import type { AxiosResponse } from 'axios';
 
 /**
@@ -43,6 +43,20 @@ const normalizeFontFamily = (value: string | undefined): string => {
     return first.replace(/^['"]|['"]$/g, '') || CHATBOX_BRAND_FONT;
 };
 
+export const resolveMessageBackgroundMode = (
+    data: Partial<Pick<ChatBoxSettings, 'message_background_mode' | 'separate_message_backgrounds'>>
+): ChatMessageBackgroundMode => {
+    if (data.message_background_mode === 'message' || data.message_background_mode === 'column' || data.message_background_mode === 'none') {
+        return data.message_background_mode;
+    }
+
+    if (data.separate_message_backgrounds === false) {
+        return 'none';
+    }
+
+    return 'message';
+};
+
 export function normalizeChatBoxSettings(data: Partial<ChatBoxSettings>): ChatBoxSettings {
     const parsedOpacity = Number.parseFloat(String(data.background_opacity));
     const fontSize = clampNumber(parseIntOr(data.font_size, 16), 8, 32);
@@ -52,6 +66,7 @@ export function normalizeChatBoxSettings(data: Partial<ChatBoxSettings>): ChatBo
     const animationDuration = clampNumber(parseIntOr(data.animation_duration, 300), 0, 2000);
     const messageFadeSeconds = clampNumber(parseIntOr(data.message_fade_seconds, 60), 10, 60);
     const textStrokeWidth = clampNumber(parseFloatOr(data.text_stroke_width, 0), 0, 3);
+    const messageBackgroundMode = resolveMessageBackgroundMode(data);
     return {
         ...data,
         font_family: normalizeFontFamily(data.font_family),
@@ -74,10 +89,11 @@ export function normalizeChatBoxSettings(data: Partial<ChatBoxSettings>): ChatBo
         show_platform_icons: data.show_platform_icons ?? true,
         show_roles: data.show_roles ?? false,
         show_badges: data.show_badges ?? true,
-        show_avatars: data.show_avatars ?? false,
         show_7tv_emotes: data.show_7tv_emotes ?? true,
         show_links: data.show_links ?? true,
         auto_load_images: data.auto_load_images ?? true,
+        separate_message_backgrounds: messageBackgroundMode === 'message',
+        message_background_mode: messageBackgroundMode,
         widget_url: data.widget_url || '',
         version: data.version || 1,
     };

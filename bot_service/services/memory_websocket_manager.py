@@ -388,15 +388,17 @@ class MemoryWebSocketManager:
         """
         Check whether user currently has an active OBS websocket sink.
         """
-        obs_token = getattr(user, "obs_token", None)
-        if not obs_token:
+        source_token = getattr(user, "tts_source_token", None)
+        legacy_token = getattr(user, "obs_token", None)
+        tokens = [token for token in (source_token, legacy_token) if token]
+        if not tokens:
             return False
 
         try:
             from core.connection_manager import get_connection_manager
 
             connection_manager = get_connection_manager()
-            return obs_token in connection_manager.obs_connections
+            return any(token in connection_manager.obs_connections for token in tokens)
         except Exception as error:
             logger.debug("Failed to resolve OBS sink state: %s", error)
             return False

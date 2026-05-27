@@ -4,6 +4,7 @@ API for ChatBox widget settings used by OBS.
 Clean Architecture: uses ChatBoxRepository for data access.
 """
 import logging
+from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, ConfigDict
@@ -36,7 +37,6 @@ class ChatBoxSettingsCreate(BaseModel):
     show_platform_icons: bool = Field(default=True)
     show_roles: bool = Field(default=False)
     show_badges: bool = Field(default=True)
-    show_avatars: bool = Field(default=False)
 
     # Text colors
     text_color: str = Field(default='#FFFFFF')
@@ -55,6 +55,8 @@ class ChatBoxSettingsCreate(BaseModel):
     show_7tv_emotes: bool = Field(default=True)
     show_links: bool = Field(default=True)
     auto_load_images: bool = Field(default=True)
+    separate_message_backgrounds: bool = Field(default=True)
+    message_background_mode: Literal['message', 'column', 'none'] = Field(default='message')
 
     # Version field used to guard against race conditions
     version: int = Field(default=1, ge=1)
@@ -72,6 +74,11 @@ class ChatBoxSettingsResponse(ChatBoxSettingsCreate):
 
 def _settings_to_response(settings, widget_url: str) -> ChatBoxSettingsResponse:
     """Convert settings model to response."""
+    message_background_mode = (
+        settings.message_background_mode
+        if getattr(settings, "message_background_mode", None) in {"message", "column", "none"}
+        else ("message" if getattr(settings, "separate_message_backgrounds", True) else "none")
+    )
     return ChatBoxSettingsResponse(
         id=settings.id,
         user_id=settings.user_id,
@@ -88,7 +95,6 @@ def _settings_to_response(settings, widget_url: str) -> ChatBoxSettingsResponse:
         show_platform_icons=settings.show_platform_icons,
         show_roles=settings.show_roles,
         show_badges=settings.show_badges,
-        show_avatars=settings.show_avatars,
         text_color=settings.text_color,
         username_color=settings.username_color,
         message_spacing=settings.message_spacing,
@@ -101,6 +107,8 @@ def _settings_to_response(settings, widget_url: str) -> ChatBoxSettingsResponse:
         show_7tv_emotes=settings.show_7tv_emotes,
         show_links=settings.show_links,
         auto_load_images=settings.auto_load_images,
+        separate_message_backgrounds=message_background_mode == 'message',
+        message_background_mode=message_background_mode,
         version=settings.version if hasattr(settings, 'version') else 1
     )
 
@@ -142,11 +150,17 @@ async def save_chatbox_settings(
     logger.info(f"[CHATBOX] Saving settings for user {user_id}, regenerate_token={regenerate_token}")
 
     repo = ChatBoxRepository(db)
+    payload = settings_data.model_dump()
+    mode = payload.get("message_background_mode")
+    if mode not in {"message", "column", "none"}:
+        mode = "message" if payload.get("separate_message_backgrounds", True) else "none"
+    payload["message_background_mode"] = mode
+    payload["separate_message_backgrounds"] = mode == "message"
     
     try:
         settings = repo.update_settings(
             user_id=user_id,
-            settings_data=settings_data.model_dump(),
+            settings_data=payload,
             client_version=settings_data.version,
             regenerate_token=regenerate_token
         )
@@ -175,7 +189,6 @@ async def save_chatbox_settings(
             "show_platform_icons": settings.show_platform_icons,
             "show_roles": settings.show_roles,
             "show_badges": settings.show_badges,
-            "show_avatars": settings.show_avatars,
             "text_color": settings.text_color,
             "text_stroke_width": settings.text_stroke_width,
             "text_stroke_color": settings.text_stroke_color,
@@ -189,7 +202,9 @@ async def save_chatbox_settings(
             "message_fade_seconds": settings.message_fade_seconds,
             "show_7tv_emotes": settings.show_7tv_emotes,
             "show_links": settings.show_links,
-            "auto_load_images": settings.auto_load_images
+            "auto_load_images": settings.auto_load_images,
+            "separate_message_backgrounds": settings.separate_message_backgrounds,
+            "message_background_mode": settings.message_background_mode,
         }
     }
 
@@ -221,6 +236,11 @@ async def get_settings_by_token(
     twitch_user_id = twitch_token.platform_user_id if twitch_token else None
 
     return {
+        "message_background_mode": (
+            settings.message_background_mode
+            if getattr(settings, "message_background_mode", None) in {"message", "column", "none"}
+            else ("message" if settings.separate_message_backgrounds else "none")
+        ),
         "user_id": settings.user_id,
         "channel_name": channel_name,
         "twitch_user_id": twitch_user_id,
@@ -235,7 +255,6 @@ async def get_settings_by_token(
         "show_platform_icons": settings.show_platform_icons,
         "show_roles": settings.show_roles,
         "show_badges": settings.show_badges,
-        "show_avatars": settings.show_avatars,
         "text_color": settings.text_color,
         "username_color": settings.username_color,
         "message_spacing": settings.message_spacing,
@@ -248,6 +267,7 @@ async def get_settings_by_token(
         "show_7tv_emotes": settings.show_7tv_emotes,
         "show_links": settings.show_links,
         "auto_load_images": settings.auto_load_images,
+        "separate_message_backgrounds": settings.separate_message_backgrounds,
         "version": settings.version if hasattr(settings, 'version') else 1
     }
 

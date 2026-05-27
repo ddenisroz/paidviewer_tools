@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 
 import { Youtube } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import ReactPlayer from 'react-player';
 import { useLocation } from 'react-router-dom';
+import YouTube from 'react-youtube';
 
 import { usePlayer } from '@/context/PlayerContext';
 import { youtubeService } from '@/services/api/services/youtubeService';
@@ -29,11 +29,14 @@ const GlobalPlayer: React.FC = () => {
         currentVideo,
         isPlaying,
         volume,
+        currentTime,
+        duration,
         isMuted,
         isVisible,
         isMinimized,
         isTheaterMode,
         queue,
+        skipVotes,
         togglePlayPause,
         setVolume,
         toggleMute,
@@ -52,6 +55,7 @@ const GlobalPlayer: React.FC = () => {
     const [showQueue, setShowQueue] = useState(false);
     const [clearQueueConfirmOpen, setClearQueueConfirmOpen] = useState(false);
     const [miniPlayerContainer, setMiniPlayerContainer] = useState<HTMLElement | null>(null);
+    const [canDockMiniPlayer, setCanDockMiniPlayer] = useState(false);
     const [playerRoot] = useState<HTMLDivElement | null>(() => {
         if (typeof document === 'undefined') return null;
         const node = document.createElement('div');
@@ -72,7 +76,35 @@ const GlobalPlayer: React.FC = () => {
     });
 
     useEffect(() => {
-        setMiniPlayerContainer(document.getElementById('youtube-mini-player-slot'));
+        const slot = document.getElementById('youtube-mini-player-slot');
+        setMiniPlayerContainer(slot);
+
+        if (!slot) {
+            setCanDockMiniPlayer(false);
+            return;
+        }
+
+        const updateDockState = () => {
+            const width = slot.getBoundingClientRect().width;
+            const isVisible = window.getComputedStyle(slot).display !== 'none';
+            setCanDockMiniPlayer(isVisible && width >= 220);
+        };
+
+        updateDockState();
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', updateDockState);
+            return () => {
+                window.removeEventListener('resize', updateDockState);
+            };
+        }
+        const observer = new ResizeObserver(updateDockState);
+        observer.observe(slot);
+        window.addEventListener('resize', updateDockState);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', updateDockState);
+        };
     }, []);
 
     // Page detection
@@ -98,12 +130,10 @@ const GlobalPlayer: React.FC = () => {
         : queue;
 
     // Player hook
-    const { playerRef, handleReady, handleEnded, handleError, handlePlay, handlePause } = useGlobalPlayer({
+    const { handleReady, handleEnded, handleError, handleStateChange, handleApiPlay, handleApiPause } =
+        useGlobalPlayer({
         displayVideo,
         currentVideo: currentVideo as DisplayVideo | null,
-        isPlaying,
-        setVolume,
-        toggleMute,
         setPlayerRef,
         handlePlayerReady,
         handlePlayerStateChange,
@@ -128,10 +158,10 @@ const GlobalPlayer: React.FC = () => {
     const confirmClearQueue = async (): Promise<void> => {
         try {
             await youtubeService.clearQueue();
-            toast.success('Очередь очищена');
+            toast.success('РћС‡РµСЂРµРґСЊ РѕС‡РёС‰РµРЅР°');
             loadQueue(true);
         } catch {
-            toast.error('Не удалось очистить очередь');
+            toast.error('РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‡РёСЃС‚РёС‚СЊ РѕС‡РµСЂРµРґСЊ');
         } finally {
             setClearQueueConfirmOpen(false);
         }
@@ -145,7 +175,7 @@ const GlobalPlayer: React.FC = () => {
             loadQueue(true);
             setShowQueue(false);
         } catch {
-            toast.error('Не удалось переключить видео');
+            toast.error('РќРµ СѓРґР°Р»РѕСЃСЊ РїРµСЂРµРєР»СЋС‡РёС‚СЊ РІРёРґРµРѕ');
         }
     };
 
@@ -159,45 +189,35 @@ const GlobalPlayer: React.FC = () => {
         }
     }, [showMiniUI, showQueue]);
 
-    const youtubeUrl = displayVideo
-        ? displayVideo.url || `https://www.youtube.com/watch?v=${displayVideo.video_id}`
-        : '';
-
-    // React-Player component (cast to any for library compatibility - same as original)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ReactPlayerAny = ReactPlayer as any;
-
     const reactPlayerComponent = hasVideo ? (
         <div
             className="relative w-full h-full"
             data-player-container="overlay"
             onPointerDownCapture={handlePlayerSurfaceInteract}
         >
-            <ReactPlayerAny
-                ref={playerRef}
-                src={youtubeUrl}
-                playing={isPlaying}
-                volume={volume / 100}
-                muted={isMuted}
-                width="100%"
-                height="100%"
-                controls={true}
-                pip={false}
-                stopOnUnmount={false}
-                onReady={() => {
-                    handleReady();
+            <YouTube
+                videoId={displayVideo?.video_id || ''}
+                className="h-full w-full [&>div]:h-full"
+                iframeClassName="h-full w-full border-0"
+                onReady={(event) => {
+                    handleReady(event);
                 }}
-                onPlay={handlePlay}
-                onPlaying={handlePlay}
-                onPause={handlePause}
-                onEnded={handleEnded}
+                onPlay={handleApiPlay}
+                onPause={handleApiPause}
+                onStateChange={handleStateChange}
+                onEnd={handleEnded}
                 onError={handleError}
-                config={{
-                    youtube: {
-                        enablejsapi: 1,
+                opts={{
+                    width: '100%',
+                    height: '100%',
+                    playerVars: {
+                        autoplay: isPlaying ? 1 : 0,
+                        controls: 1,
                         rel: 0,
+                        modestbranding: 1,
                         iv_load_policy: 3,
                         cc_load_policy: 0,
+                        playsinline: 1,
                         hl: 'ru',
                         origin: window.location.origin,
                     },
@@ -275,12 +295,12 @@ const GlobalPlayer: React.FC = () => {
 
     return (
         <>
-            {/* Keep a single ReactPlayer instance mounted in a fixed overlay root */}
+            {/* Keep a single YouTube iframe mounted in a fixed overlay root */}
             {playerRoot && reactPlayerComponent && createPortal(reactPlayerComponent, playerRoot)}
 
             {/* Mini player UI */}
             {showMiniUI &&
-                (miniPlayerContainer ? (
+                (miniPlayerContainer && canDockMiniPlayer ? (
                     createPortal(
                         <MiniPlayerUI
                             displayVideo={activeDisplayVideo}
@@ -288,6 +308,9 @@ const GlobalPlayer: React.FC = () => {
                             isPlaying={isPlaying}
                             isMuted={isMuted}
                             volume={volume}
+                            currentTime={currentTime}
+                            durationSeconds={duration}
+                            skipVotes={skipVotes}
                             queue={upcomingQueue as DisplayVideo[]}
                             showQueue={showQueue}
                             onToggleQueue={() => setShowQueue(!showQueue)}
@@ -309,6 +332,9 @@ const GlobalPlayer: React.FC = () => {
                         isPlaying={isPlaying}
                         isMuted={isMuted}
                         volume={volume}
+                        currentTime={currentTime}
+                        durationSeconds={duration}
+                        skipVotes={skipVotes}
                         queue={upcomingQueue as DisplayVideo[]}
                         showQueue={showQueue}
                         onToggleQueue={() => setShowQueue(!showQueue)}
@@ -350,9 +376,9 @@ const GlobalPlayer: React.FC = () => {
             <ConfirmDialog
                 open={clearQueueConfirmOpen}
                 onOpenChange={setClearQueueConfirmOpen}
-                title="Очистить очередь"
-                description="Все треки будут удалены из очереди."
-                confirmLabel="Очистить"
+                title="РћС‡РёСЃС‚РёС‚СЊ РѕС‡РµСЂРµРґСЊ"
+                description="Р’СЃРµ С‚СЂРµРєРё Р±СѓРґСѓС‚ СѓРґР°Р»РµРЅС‹ РёР· РѕС‡РµСЂРµРґРё."
+                confirmLabel="РћС‡РёСЃС‚РёС‚СЊ"
                 variant="destructive"
                 onConfirm={confirmClearQueue}
             />

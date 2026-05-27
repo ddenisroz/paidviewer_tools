@@ -21,6 +21,8 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
         isSocketConnected,
         clearQueue,
         skipCurrent,
+        startPlayback,
+        stopPlayback,
         unlockAudio,
         setOutputVolume,
     } = useTtsPlayer();
@@ -96,6 +98,11 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
                     void unlockAudio();
                     skipCurrent();
                 }}
+                onStart={() => {
+                    void unlockAudio();
+                    startPlayback();
+                }}
+                onStop={stopPlayback}
                 onUnlockAudio={() => void unlockAudio()}
                 onVolumeChange={handleVolumeChange}
             />

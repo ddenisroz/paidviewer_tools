@@ -13,7 +13,6 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import {
     AlertCircle,
     Copy,
-    ExternalLink,
     Eye,
     EyeOff,
     Maximize,
@@ -21,13 +20,11 @@ import {
     MonitorPlay,
     Pause,
     Play,
-    Plus,
     Settings,
     SkipForward,
     Trash2,
     Volume2,
     VolumeX,
-    X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -67,6 +64,10 @@ const PLAYER_DANGER_BUTTON_CLASS =
     'border-red-500/30 bg-background/60 text-red-400 hover:bg-background/60 hover:text-red-300';
 const PLAYER_STATUS_BUTTON_CLASS =
     'h-9 px-3 gap-2 border-border/60 bg-background/60 disabled:opacity-60 hover:bg-background/60';
+const SETTINGS_CARD_CLASS = 'space-y-3 rounded-lg border border-border/60 bg-card/70 p-3';
+const SETTINGS_SUBCARD_CLASS = 'rounded-md border border-border/50 bg-background/35 p-3';
+const DEFAULT_VIDEO_REWARD_TITLE = 'Заказ видео';
+const DEFAULT_VIDEO_REWARD_COST = 1000;
 
 const YoutubeIntegrationPage: React.FC = () => {
     const navigate = useNavigate();
@@ -97,18 +98,13 @@ const YoutubeIntegrationPage: React.FC = () => {
         })
     );
 
-    const handleCreateReward = async () => {
-        if (!newRewardTitle) {
-            toast.error('Введите название награды');
-            return;
-        }
-
+    const handleUpsertReward = async (platform: 'twitch' | 'vk') => {
         try {
-            const platform = requestsRewardEditorPlatform;
             const channelName = platform === 'vk' ? integrations.vk?.username : integrations.twitch?.username;
+            const rewardId = platform === 'twitch' ? requestsRewardTwitchId : requestsRewardVkId;
 
             const payload = {
-                title: newRewardTitle,
+                title: DEFAULT_VIDEO_REWARD_TITLE,
                 description: 'Заказ YouTube видео',
                 cost: newRewardCost,
                 prompt: 'Отправьте ссылку на YouTube видео',
@@ -118,30 +114,30 @@ const YoutubeIntegrationPage: React.FC = () => {
                 channel_name: channelName || '',
             };
 
-            const response = (await pointsApi.createReward(platform, payload)) as {
+            const response = (rewardId
+                ? await pointsApi.updateReward(platform, rewardId, payload)
+                : await pointsApi.createReward(platform, payload)) as {
                 reward?: { id?: string; name?: string; title?: string };
             };
 
             if (platform === 'twitch') {
-                const rewardId = response?.reward?.id;
-                if (rewardId) {
-                    setRequestsRewardTwitchId(rewardId);
+                const nextRewardId = response?.reward?.id || rewardId;
+                if (nextRewardId) {
+                    setRequestsRewardTwitchId(nextRewardId);
                     setRequestsRewardTwitchEnabled(true);
-                    setIsCreatingReward(false);
-                    toast.success('Награда создана и выбрана');
+                    toast.success(rewardId ? 'Награда Twitch обновлена' : 'Награда Twitch создана');
                 } else {
                     toast.error('Не удалось получить ID награды');
                 }
             } else {
-                const rewardTitle = response?.reward?.name || response?.reward?.title || newRewardTitle;
+                const rewardTitle = response?.reward?.name || response?.reward?.title || rewardId || DEFAULT_VIDEO_REWARD_TITLE;
                 setRequestsRewardVkId(rewardTitle);
                 setRequestsRewardVkEnabled(true);
-                setIsCreatingReward(false);
-                toast.success('Награда создана и выбрана');
+                toast.success(rewardId ? 'Награда VK обновлена' : 'Награда VK создана');
             }
         } catch (error) {
-            logger.error('Failed to create reward', error);
-            toast.error('Ошибка создания награды');
+            logger.error('Failed to upsert reward', error);
+            toast.error('Не удалось подготовить награду');
         }
     };
 
@@ -175,21 +171,26 @@ const YoutubeIntegrationPage: React.FC = () => {
     const [isClearDialogOpen, setIsClearDialogOpen] = useState<boolean>(false);
     const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState<boolean>(false);
     const [requestsCommandEnabled, setRequestsCommandEnabled] = useState<boolean>(true);
-    const [requestsRewardEditorPlatform, setRequestsRewardEditorPlatform] = useState<'twitch' | 'vk'>('twitch');
     const [requestsRewardTwitchEnabled, setRequestsRewardTwitchEnabled] = useState<boolean>(false);
     const [requestsRewardVkEnabled, setRequestsRewardVkEnabled] = useState<boolean>(false);
     const [requestsRewardTwitchId, setRequestsRewardTwitchId] = useState<string>('');
     const [requestsRewardVkId, setRequestsRewardVkId] = useState<string>('');
+    const [donationalertsVideoEnabled, setDonationalertsVideoEnabled] = useState<boolean>(false);
+    const [donationalertsVideoMinAmount, setDonationalertsVideoMinAmount] = useState<number>(0);
     const [obsOverlayMode, setObsOverlayMode] = useState<'video' | 'track'>('track');
     const [youtubeObsUrl, setYoutubeObsUrl] = useState('');
     const [isObsUrlLoading, setIsObsUrlLoading] = useState(false);
-    const [isCreatingReward, setIsCreatingReward] = useState(false);
     const [isOrdersSaving, setIsOrdersSaving] = useState(false);
-    const [newRewardTitle, setNewRewardTitle] = useState('Заказ видео');
-    const [newRewardCost, setNewRewardCost] = useState(1000);
+    const [newRewardCost, setNewRewardCost] = useState(DEFAULT_VIDEO_REWARD_COST);
     const { lastJsonMessage } = useChat();
     const hasVideo = Boolean(currentVideo || queue.length > 0);
     const ordersClosed = !requestsCommandEnabled && !requestsRewardTwitchEnabled && !requestsRewardVkEnabled;
+    const activeSkipVotes =
+        currentVideo &&
+        skipVotes &&
+        (skipVotes.video_id == null || skipVotes.video_id === currentVideo.id || skipVotes.video_id === currentVideo.video_id)
+            ? skipVotes
+            : null;
     const lastOrdersStateRef = useRef<{ command: boolean; twitchReward: boolean; vkReward: boolean } | null>(null);
     const setVolumeRef = useRef(setVolume);
 
@@ -223,6 +224,8 @@ const YoutubeIntegrationPage: React.FC = () => {
             setRequestsRewardVkEnabled(rewardState.requestsRewardVkEnabled);
             setRequestsRewardTwitchId(rewardState.requestsRewardTwitchId);
             setRequestsRewardVkId(rewardState.requestsRewardVkId);
+            setDonationalertsVideoEnabled(Boolean(response.data.donationalerts_video_enabled));
+            setDonationalertsVideoMinAmount(Number(response.data.donationalerts_video_min_amount || 0));
         } catch (error) {
             logger.error('Error loading YouTube settings:', error);
         }
@@ -233,6 +236,9 @@ const YoutubeIntegrationPage: React.FC = () => {
             await youtubeService.saveSettings({
                 obs_overlay_mode: obsOverlayMode,
                 requests_command_enabled: requestsCommandEnabled,
+                donationalerts_video_enabled: donationalertsVideoEnabled,
+                donationalerts_video_min_amount: Math.max(0, Number(donationalertsVideoMinAmount) || 0),
+                donationalerts_video_priority_next: true,
                 ...buildYoutubeRewardPayload({
                     requestsRewardTwitchEnabled,
                     requestsRewardVkEnabled,
@@ -248,30 +254,26 @@ const YoutubeIntegrationPage: React.FC = () => {
         }
     };
 
-    const handleGenerateYoutubeObsUrl = useCallback(async (regenerate = false): Promise<void> => {
+    const handleObsLinkButton = useCallback(async (): Promise<void> => {
         try {
             setIsObsUrlLoading(true);
-            const response = regenerate ? await youtubeService.regenerateObsUrl() : await youtubeService.generateObsUrl();
-            const nextUrl = response.data.youtube_obs_url || '';
-            setYoutubeObsUrl(nextUrl);
-            if (nextUrl) {
-                toast.success(regenerate ? 'OBS ссылка обновлена' : 'OBS ссылка готова');
+            let ensuredUrl = youtubeObsUrl;
+            if (!ensuredUrl) {
+                const response = await youtubeService.generateObsUrl();
+                ensuredUrl = response.data.youtube_obs_url || '';
+                setYoutubeObsUrl(ensuredUrl);
             }
+            if (!ensuredUrl) {
+                toast.error('Не удалось получить OBS ссылку');
+                return;
+            }
+            await navigator.clipboard.writeText(ensuredUrl);
+            toast.success('OBS ссылка скопирована');
         } catch (error) {
-            logger.error('Error generating YouTube OBS URL:', error);
+            logger.error('Error preparing OBS URL:', error);
             toast.error('Не удалось подготовить OBS ссылку');
         } finally {
             setIsObsUrlLoading(false);
-        }
-    }, []);
-
-    const handleCopyYoutubeObsUrl = useCallback(async (): Promise<void> => {
-        if (!youtubeObsUrl) return;
-        try {
-            await navigator.clipboard.writeText(youtubeObsUrl);
-            toast.success('OBS ссылка скопирована');
-        } catch {
-            toast.error('Не удалось скопировать ссылку');
         }
     }, [youtubeObsUrl]);
 
@@ -386,7 +388,7 @@ const YoutubeIntegrationPage: React.FC = () => {
 
     useEffect(() => {
         const messageType = (lastJsonMessage as { type?: string } | null)?.type;
-        if (messageType === 'youtube_queue_update' || messageType === 'youtube_queue_updated') {
+        if (messageType === 'youtube_queue_updated') {
             logger.log('[YouTube] Queue updated via WebSocket');
         }
     }, [lastJsonMessage]);
@@ -394,13 +396,6 @@ const YoutubeIntegrationPage: React.FC = () => {
     const markUserStarted = useCallback((): void => {
         markPlaybackStarted();
     }, [markPlaybackStarted]);
-
-    const handlePlayerSurfaceClick = useCallback((): void => {
-        if (!hasVideo) {
-            return;
-        }
-        markUserStarted();
-    }, [hasVideo, markUserStarted]);
 
     const handleNextVideo = useCallback((): void => {
         markUserStarted();
@@ -541,23 +536,123 @@ const YoutubeIntegrationPage: React.FC = () => {
             </Dialog>
 
             <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
-                <DialogContent className="sm:max-w-[720px] bg-background border-border">
+                <DialogContent className="max-w-[min(880px,calc(100vw-2rem))] bg-background border-border">
                     <DialogHeader>
                         <DialogTitle className="text-base font-semibold text-foreground">Заказы видео</DialogTitle>
                     </DialogHeader>
 
-                    <div className="grid gap-3 py-3 sm:grid-cols-2">
-                        <div className="flex items-center justify-between rounded-lg border border-border/60 bg-card/70 px-3 py-2.5">
-                            <Label htmlFor="cmd-enabled" className="text-sm font-bold text-foreground">
-                                Команда
-                            </Label>
-                            <Switch id="cmd-enabled" checked={requestsCommandEnabled} onCheckedChange={setRequestsCommandEnabled} />
+                    <div className="space-y-3 py-3">
+                        <div className={SETTINGS_CARD_CLASS}>
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <div className="text-sm font-semibold text-foreground">Источники заказов</div>
+                                    <div className="text-xs text-muted-foreground">Команда и площадки, из которых принимаются заявки.</div>
+                                </div>
+                                <Switch id="cmd-enabled" checked={requestsCommandEnabled} onCheckedChange={setRequestsCommandEnabled} />
+                            </div>
+                            <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-3">
+                                <div className={SETTINGS_SUBCARD_CLASS}>
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <Label htmlFor="cmd-enabled" className="text-sm font-bold text-foreground">
+                                            Команда
+                                        </Label>
+                                        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">!sr</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Разрешить добавление видео через чат-команду.</p>
+                                </div>
+
+                                <div className={SETTINGS_SUBCARD_CLASS}>
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <Label className="text-sm font-bold text-foreground">Twitch</Label>
+                                        <Switch checked={requestsRewardTwitchEnabled} onCheckedChange={setRequestsRewardTwitchEnabled} disabled={!integrations.twitch?.enabled} />
+                                    </div>
+                                    <details className="group">
+                                        <summary className="cursor-pointer list-none text-xs font-semibold text-sky-300 group-open:mb-2">
+                                            Ручная привязка награды
+                                        </summary>
+                                        <Input value={requestsRewardTwitchId} onChange={(event) => setRequestsRewardTwitchId(event.target.value)} placeholder="Reward ID" className="h-8 font-mono text-xs" />
+                                    </details>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="mt-3 h-8 w-full"
+                                        disabled={!integrations.twitch?.enabled}
+                                        onClick={() => void handleUpsertReward('twitch')}
+                                    >
+                                        {requestsRewardTwitchId ? 'Обновить и привязать' : 'Создать и привязать'}
+                                    </Button>
+                                </div>
+
+                                <div className={SETTINGS_SUBCARD_CLASS}>
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <Label className="text-sm font-bold text-foreground">VK Live</Label>
+                                        <Switch checked={requestsRewardVkEnabled} onCheckedChange={setRequestsRewardVkEnabled} disabled={!integrations.vk?.enabled} />
+                                    </div>
+                                    <details className="group">
+                                        <summary className="cursor-pointer list-none text-xs font-semibold text-sky-300 group-open:mb-2">
+                                            Ручная привязка награды
+                                        </summary>
+                                        <Input value={requestsRewardVkId} onChange={(event) => setRequestsRewardVkId(event.target.value)} placeholder="Название награды" className="h-8 text-xs" />
+                                    </details>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="mt-3 h-8 w-full"
+                                        disabled={!integrations.vk?.enabled}
+                                        onClick={() => void handleUpsertReward('vk')}
+                                    >
+                                        {requestsRewardVkId ? 'Обновить и привязать' : 'Создать и привязать'}
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="grid gap-2 rounded-md border border-border/50 bg-background/35 p-3 grid-cols-[180px_minmax(0,1fr)]">
+                                <Label htmlFor="reward-cost" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    Цена награды
+                                </Label>
+                                <Input
+                                    id="reward-cost"
+                                    type="number"
+                                    min={0}
+                                    value={newRewardCost}
+                                    onChange={(event) => setNewRewardCost(Number(event.target.value) || 0)}
+                                    className="h-8 text-xs"
+                                />
+                            </div>
                         </div>
 
-                        <div className="rounded-lg border border-border/60 bg-card/70 p-3">
-                            <div className="mb-2 flex items-center justify-between gap-2">
-                                <Label className="text-sm font-bold text-foreground">OBS</Label>
-                                <MonitorPlay className="h-4 w-4 text-sky-300" />
+                        <div className={SETTINGS_CARD_CLASS}>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="text-sm font-semibold text-foreground">Paid video</div>
+                                    <div className="text-xs text-muted-foreground">Подхват YouTube-ссылки из DonationAlerts с тарифом за минуту видео.</div>
+                                </div>
+                                <Switch checked={donationalertsVideoEnabled} onCheckedChange={setDonationalertsVideoEnabled} />
+                            </div>
+                            <div className="grid gap-2 rounded-md border border-border/50 bg-background/35 p-3 grid-cols-[180px_minmax(0,1fr)]">
+                                <Label htmlFor="paid-rate" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                    Тариф, руб/мин
+                                </Label>
+                                <Input
+                                    id="paid-rate"
+                                    type="number"
+                                    min={0}
+                                    value={donationalertsVideoMinAmount}
+                                    onChange={(event) => setDonationalertsVideoMinAmount(Number(event.target.value) || 0)}
+                                    placeholder="Например 50"
+                                    className="h-8 text-xs"
+                                />
+                            </div>
+                        </div>
+
+                        <div className={SETTINGS_CARD_CLASS}>
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <div className="text-sm font-semibold text-foreground">OBS overlay</div>
+                                    <div className="text-xs text-muted-foreground">Режим виджета и ссылка для OBS.</div>
+                                </div>
+                                <MonitorPlay className="mt-0.5 h-4 w-4 text-sky-300" />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <Button type="button" size="sm" variant={obsOverlayMode === 'track' ? 'default' : 'outline'} onClick={() => setObsOverlayMode('track')}>
@@ -567,62 +662,13 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     Видео
                                 </Button>
                             </div>
-                        </div>
-
-                        <div className="space-y-2 rounded-lg border border-border/60 bg-card/70 p-3">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-sm font-bold text-foreground">Twitch</Label>
-                                <Switch checked={requestsRewardTwitchEnabled} onCheckedChange={setRequestsRewardTwitchEnabled} disabled={!integrations.twitch?.enabled} />
-                            </div>
-                            <Input value={requestsRewardTwitchId} onChange={(event) => setRequestsRewardTwitchId(event.target.value)} placeholder="Reward ID" className="h-8 font-mono text-xs" />
-                        </div>
-
-                        <div className="space-y-2 rounded-lg border border-border/60 bg-card/70 p-3">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-sm font-bold text-foreground">VK Live</Label>
-                                <Switch checked={requestsRewardVkEnabled} onCheckedChange={setRequestsRewardVkEnabled} disabled={!integrations.vk?.enabled} />
-                            </div>
-                            <Input value={requestsRewardVkId} onChange={(event) => setRequestsRewardVkId(event.target.value)} placeholder="Название награды" className="h-8 text-xs" />
-                        </div>
-
-                        <div className="space-y-2 rounded-lg border border-border/60 bg-card/70 p-3 sm:col-span-2">
-                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-                                <Input value={youtubeObsUrl} readOnly placeholder="OBS ссылка" className="h-9 min-w-0 bg-background/70 font-mono text-xs" />
-                                <Button type="button" variant="outline" size="icon" onClick={handleCopyYoutubeObsUrl} disabled={!youtubeObsUrl} aria-label="Скопировать OBS ссылку">
-                                    <Copy className="h-4 w-4" />
-                                </Button>
-                                <Button type="button" variant="outline" size="icon" onClick={() => youtubeObsUrl && window.open(youtubeObsUrl, '_blank', 'noopener,noreferrer')} disabled={!youtubeObsUrl} aria-label="Предпросмотр OBS">
-                                    <ExternalLink className="h-4 w-4" />
-                                </Button>
-                                <Button type="button" size="sm" onClick={() => void handleGenerateYoutubeObsUrl(false)} disabled={isObsUrlLoading}>
-                                    Ссылка
+                            <div className="flex justify-end">
+                                <Button type="button" size="sm" onClick={() => void handleObsLinkButton()} disabled={isObsUrlLoading} className="min-w-[132px]">
+                                    <Copy className="mr-2 h-4 w-4" />
+                                    OBS ссылка
                                 </Button>
                             </div>
                         </div>
-
-                        {isCreatingReward ? (
-                            <div className="grid gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 sm:col-span-2 sm:grid-cols-[auto_auto_1fr_160px_auto_auto]">
-                                <Button type="button" size="sm" variant={requestsRewardEditorPlatform === 'twitch' ? 'default' : 'outline'} onClick={() => setRequestsRewardEditorPlatform('twitch')} disabled={!integrations.twitch?.enabled} className="h-8">
-                                    Twitch
-                                </Button>
-                                <Button type="button" size="sm" variant={requestsRewardEditorPlatform === 'vk' ? 'default' : 'outline'} onClick={() => setRequestsRewardEditorPlatform('vk')} disabled={!integrations.vk?.enabled} className="h-8">
-                                    VK
-                                </Button>
-                                <Input value={newRewardTitle} onChange={(event) => setNewRewardTitle(event.target.value)} placeholder="Название" className="h-8 text-xs" />
-                                <Input type="number" value={newRewardCost} onChange={(event) => setNewRewardCost(Number(event.target.value))} placeholder="Цена" className="h-8 text-xs" />
-                                <Button size="sm" onClick={handleCreateReward} className="h-8">
-                                    OK
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => setIsCreatingReward(false)} className="h-8">
-                                    <X className="h-3.5 w-3.5" />
-                                </Button>
-                            </div>
-                        ) : (
-                            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreatingReward(true)} className="h-9 sm:col-span-2">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Создать награду
-                            </Button>
-                        )}
                     </div>
 
                     <DialogFooter className="border-t border-border pt-3">
@@ -644,9 +690,8 @@ const YoutubeIntegrationPage: React.FC = () => {
                             <div className="grid w-full grid-cols-[minmax(220px,320px)_minmax(0,1fr)] items-start gap-3">
                                 <div className="w-full space-y-3">
                                     <div
-                                        className="relative bg-black rounded-lg overflow-hidden aspect-video cursor-pointer"
+                                        className="relative aspect-video overflow-hidden rounded-lg bg-black"
                                         onPointerDown={markUserStarted}
-                                        onClick={handlePlayerSurfaceClick}
                                     >
                                         {/* Container for YouTube portal from GlobalPlayer */}
                                         <div
@@ -691,6 +736,11 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 >
                                                     <SkipForward className="w-5 h-5" />
                                                 </Button>
+                                                {activeSkipVotes ? (
+                                                    <div className="rounded-md border border-border/60 bg-background/45 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                                        Голоса за пропуск: {activeSkipVotes.current}/{activeSkipVotes.required}
+                                                    </div>
+                                                ) : null}
                                             </div>
                                             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                                                 <Button
@@ -812,9 +862,8 @@ const YoutubeIntegrationPage: React.FC = () => {
                     <CardContent className="grid h-full grid-cols-[minmax(0,1fr)_minmax(240px,360px)] gap-3 p-3">
                         <div className="flex flex-col h-full min-h-0 overflow-hidden">
                             <div
-                                className="flex-1 min-h-0 bg-black rounded-lg overflow-hidden relative cursor-pointer"
+                                className="relative flex-1 min-h-0 overflow-hidden rounded-lg bg-black"
                                 onPointerDown={markUserStarted}
-                                onClick={handlePlayerSurfaceClick}
                             >
                                 {/* Container for YouTube portal from GlobalPlayer in theater mode */}
                                 <div
@@ -856,6 +905,11 @@ const YoutubeIntegrationPage: React.FC = () => {
                                         >
                                             <SkipForward className="w-5 h-5" />
                                         </Button>
+                                        {activeSkipVotes ? (
+                                            <div className="rounded-md border border-border/60 bg-background/45 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                                Голоса за пропуск: {activeSkipVotes.current}/{activeSkipVotes.required}
+                                            </div>
+                                        ) : null}
                                     </div>
                                     <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                                         <Button

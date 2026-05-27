@@ -41,6 +41,9 @@ class YouTubeSettingsResponse(BaseModel):
     requests_reward_twitch_id: Optional[str] = Field(None, description='Twitch reward ID')
     requests_reward_vk_enabled: bool = Field(default=False, description='Allow VK reward requests')
     requests_reward_vk_id: Optional[str] = Field(None, description='VK reward title')
+    donationalerts_video_enabled: bool = Field(default=False, description='Allow DonationAlerts paid video links')
+    donationalerts_video_min_amount: float = Field(default=0, ge=0, description='Minimum DonationAlerts amount for paid video')
+    donationalerts_video_priority_next: bool = Field(default=True, description='Put paid videos into the next slot')
 
 
 class YouTubeSettingsUpdate(BaseModel):
@@ -61,6 +64,9 @@ class YouTubeSettingsUpdate(BaseModel):
     requests_reward_twitch_id: Optional[str] = Field(None, description='Twitch reward ID')
     requests_reward_vk_enabled: Optional[bool] = Field(None, description='Allow VK reward requests')
     requests_reward_vk_id: Optional[str] = Field(None, description='VK reward title')
+    donationalerts_video_enabled: Optional[bool] = Field(None, description='Allow DonationAlerts paid video links')
+    donationalerts_video_min_amount: Optional[float] = Field(None, ge=0, description='Minimum DonationAlerts amount for paid video')
+    donationalerts_video_priority_next: Optional[bool] = Field(None, description='Put paid videos into the next slot')
 
 def _get_youtube_settings_from_tts(tts_settings) -> dict:
     """Extract and normalize YouTube settings from TTS settings object."""

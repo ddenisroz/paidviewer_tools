@@ -13,6 +13,7 @@ import {
     extractSettingsFromResponse,
     loadGoogleFont,
     normalizeChatBoxSettings,
+    resolveMessageBackgroundMode,
 } from '@/features/chatbox/utils/chatboxHelpers';
 import { chatboxService } from '@/services/api/services/chatboxService';
 import { Button } from '@/shared/components/ui/button';
@@ -56,10 +57,11 @@ const DEFAULT_SETTINGS: ChatBoxSettings = {
     show_platform_icons: true,
     show_roles: false,
     show_badges: true,
-    show_avatars: false,
     show_7tv_emotes: true,
     show_links: true,
     auto_load_images: true,
+    separate_message_backgrounds: true,
+    message_background_mode: 'message',
     widget_url: '',
     version: 1,
 };
@@ -89,6 +91,12 @@ const ANIMATION_OPTIONS = [
 const CHAT_DIRECTION_OPTIONS = [
     { value: 'vertical', label: 'Вертикально' },
     { value: 'horizontal', label: 'Горизонтально' },
+];
+
+const MESSAGE_BACKGROUND_OPTIONS = [
+    { value: 'message', label: 'Карточки' },
+    { value: 'column', label: 'Сплошной фон' },
+    { value: 'none', label: 'Без фона' },
 ];
 
 const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onClose, onSave }) => {
@@ -201,6 +209,24 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
     const handleChange = (key: keyof ChatBoxSettings, value: string | number | boolean) => {
         setSettings((prev) => {
+            if (key === 'message_background_mode') {
+                const nextMode = value as ChatBoxSettings['message_background_mode'];
+                return {
+                    ...prev,
+                    message_background_mode: nextMode,
+                    separate_message_backgrounds: nextMode === 'message',
+                };
+            }
+
+            if (key === 'separate_message_backgrounds') {
+                const nextMode = value === false ? 'none' : 'message';
+                return {
+                    ...prev,
+                    separate_message_backgrounds: Boolean(value),
+                    message_background_mode: nextMode,
+                };
+            }
+
             if (key === 'chat_direction') {
                 const nextDirection = String(value);
                 return {
@@ -287,7 +313,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                     </div>
 
                     {/* Content */}
-                    <div className="grid flex-1 grid-cols-[minmax(260px,0.42fr)_minmax(0,1fr)] gap-4 overflow-hidden bg-background p-4 min-[1280px]:gap-6 min-[1280px]:p-5">
+                    <div className="grid flex-1 grid-cols-[minmax(260px,0.42fr)_minmax(0,1fr)] gap-5 overflow-hidden bg-background p-4">
                         {/* Left: Preview */}
                         <div
                             className="flex min-h-0 w-full flex-col gap-3"
@@ -597,18 +623,29 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                 />
                                             </div>
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
-                                                <Label className="text-sm text-foreground">Аватарки</Label>
-                                                <Switch
-                                                    checked={settings.show_avatars ?? false}
-                                                    onCheckedChange={(v) => handleChange('show_avatars', v)}
-                                                />
-                                            </div>
-                                            <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">Автозагрузка медиа</Label>
                                                 <Switch
                                                     checked={settings.auto_load_images ?? true}
                                                     onCheckedChange={(v) => handleChange('auto_load_images', v)}
                                                 />
+                                            </div>
+                                            <div className="space-y-2 rounded-md border border-border/60 bg-background/70 px-3 py-2">
+                                                <Label className="text-sm text-foreground">Режим фона сообщений</Label>
+                                                <Select
+                                                    value={resolveMessageBackgroundMode(settings)}
+                                                    onValueChange={(v) => handleChange('message_background_mode', v)}
+                                                >
+                                                    <SelectTrigger className={SETTINGS_SELECT_TRIGGER_CLASS}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-card border-border/60 z-[11000] font-base">
+                                                        {MESSAGE_BACKGROUND_OPTIONS.map((option) => (
+                                                            <SelectItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                         </div>
                                     </div>
@@ -704,9 +741,11 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                             <Button
                                 onClick={() => handleSave(false)}
                                 disabled={saving}
-                                className="h-9 bg-none bg-primary hover:bg-primary/90"
+                                className="h-9 min-w-[132px] bg-none bg-primary hover:bg-primary/90"
                             >
-                                {saving ? 'Сохранение...' : 'Сохранить'}
+                                <span className="inline-block text-center">
+                                    {saving ? 'Сохранение...' : 'Сохранить'}
+                                </span>
                             </Button>
                         </div>
                     </div>

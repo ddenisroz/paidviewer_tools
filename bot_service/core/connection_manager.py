@@ -57,6 +57,17 @@ class ConnectionManager(ConnectionManagerCore):
         else:
             loop.create_task(awaitable)
 
+    @staticmethod
+    def _verify_obs_audio_token(token: str) -> dict | None:
+        from auth.auth import verify_jwt_token
+
+        for expected_type in ("tts_source", "obs"):
+            try:
+                return verify_jwt_token(token, expected_type=expected_type)
+            except Exception:
+                continue
+        return None
+
     @classmethod
     def _close_websocket_best_effort(cls, websocket: Any) -> None:
         close_method = getattr(websocket, "close", None)
@@ -134,11 +145,8 @@ class ConnectionManager(ConnectionManagerCore):
             self.obs_connections[token] = websocket
             logger.info(f"OBS WebSocket connected: {token[:10]}...")
 
-            # Cancel delayed TTS disconnect when OBS reconnects.
-            from auth.auth import verify_jwt_token
-
             try:
-                payload = verify_jwt_token(token, expected_type="obs")
+                payload = self._verify_obs_audio_token(token)
                 if payload and 'user_id' in payload:
                     user_id = payload['user_id']
                     self.cancel_tts_disconnect(user_id)
@@ -172,11 +180,10 @@ class ConnectionManager(ConnectionManagerCore):
             logger.info(f"OBS WebSocket disconnected: {token[:10]}...")
 
             # Schedule TTS disconnect if no other active listeners remain.
-            from auth.auth import verify_jwt_token
             from core.database import get_db, User
 
             try:
-                payload = verify_jwt_token(token, expected_type="obs")
+                payload = self._verify_obs_audio_token(token)
                 if payload and 'user_id' in payload:
                     user_id = payload['user_id']
                     db = next(get_db())

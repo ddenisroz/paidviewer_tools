@@ -2,19 +2,23 @@
 
 import asyncio
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from constants import MAX_YOUTUBE_QUEUE_SIZE
 from core.database import ChannelPoints, PointsTransaction, YouTubeQueue, get_db
 from core.datetime_utils import utcnow_naive
 from repositories.points_repository import PointsRepository
+from repositories.user_repository import UserRepository
 from repositories.youtube_queue_repository import YouTubeQueueRepository
 from utils.websocket_broadcast import broadcast_youtube_queue_update
 
 from .youtube_service import YouTubeService
 
 logger = logging.getLogger("bot_service")
+DEFAULT_REQUESTER_RE = re.compile(r"^user[_\-\s]?\d+$", flags=re.IGNORECASE)
 
 
 class QueueService:
@@ -56,6 +60,51 @@ class QueueService:
             session_id = None
         return (user_id, session_id, db)
 
+    @staticmethod
+    def _clean_requester_name(value: str | None) -> str | None:
+        normalized = str(value or "").strip()
+        if not normalized:
+            return None
+        if DEFAULT_REQUESTER_RE.match(normalized):
+            return None
+        return normalized
+
+    def _resolve_requester_name(
+        self,
+        *,
+        user_id: int | None,
+        platform: str | None,
+        requester_name: str | None,
+        requester_id: str | None,
+        db: Session,
+    ) -> str:
+        explicit_name = self._clean_requester_name(requester_name)
+        if explicit_name:
+            return explicit_name
+
+        user = UserRepository(db).get_by_id(int(user_id)) if user_id else None
+        if user is not None:
+            platform_key = str(platform or "").strip().lower()
+            candidates: list[str | None]
+            if platform_key == "vk":
+                candidates = [user.vk_username, user.vk_channel_name, user.twitch_username]
+            elif platform_key in {"twitch", "donationalerts", "web"}:
+                candidates = [user.twitch_username, user.vk_username, user.vk_channel_name]
+            else:
+                candidates = [user.twitch_username, user.vk_username, user.vk_channel_name]
+
+            for candidate in candidates:
+                cleaned = self._clean_requester_name(candidate)
+                if cleaned:
+                    return cleaned
+
+        cleaned_requester_id = str(requester_id or "").strip()
+        if cleaned_requester_id:
+            return cleaned_requester_id
+        if user_id:
+            return f"User_{user_id}"
+        return "Unknown"
+
     async def add_video_to_user_queue(
         self,
         user_id: int,
@@ -66,6 +115,11 @@ class QueueService:
         requester_id: str | None = None,
         is_paid: bool = False,
         points_cost: int | None = None,
+        paid_source: str | None = None,
+        paid_amount: float | None = None,
+        paid_currency: str | None = None,
+        source_alert_id: str | None = None,
+        priority_next: bool = False,
         db: Session | None = None,
     ) -> Dict[str, Any]:
         """Active user-only queue path for dashboard and bot commands."""
@@ -79,10 +133,15 @@ class QueueService:
             requester_id=requester_id,
             is_paid=is_paid,
             points_cost=points_cost,
+            paid_source=paid_source,
+            paid_amount=paid_amount,
+            paid_currency=paid_currency,
+            source_alert_id=source_alert_id,
+            priority_next=priority_next,
             db=db,
         )
 
-    async def add_video_to_queue(self, user_id: int=None, session_id: str=None, video_url: str=None, channel_name: str=None, platform: str=None, requester_name: str=None, requester_id: str=None, is_paid: bool=False, points_cost: int=None, db: Session=None) -> Dict[str, Any]:
+    async def add_video_to_queue(self, user_id: int=None, session_id: str=None, video_url: str=None, channel_name: str=None, platform: str=None, requester_name: str=None, requester_id: str=None, is_paid: bool=False, points_cost: int=None, paid_source: str | None=None, paid_amount: float | None=None, paid_currency: str | None=None, source_alert_id: str | None=None, priority_next: bool=False, db: Session=None) -> Dict[str, Any]:
         """Add a video to the queue."""
         user_id, session_id, db = self._normalize_scope_args(user_id=user_id, session_id=session_id, db=db)
         if db is None:
@@ -94,6 +153,11 @@ class QueueService:
             queue_repo = YouTubeQueueRepository(db)
             if not user_id and (not session_id):
                 return {'success': False, 'error': 'user_id or session_id is required.'}
+            if queue_repo.count_pending(user_id=user_id, session_id=session_id) >= MAX_YOUTUBE_QUEUE_SIZE:
+                return {
+                    'success': False,
+                    'error': f'Queue limit reached: at most {MAX_YOUTUBE_QUEUE_SIZE} videos are allowed. Remove old items before adding more.',
+                }
             video_input = (video_url or '').strip()
             if not video_input:
                 return {'success': False, 'error': 'Provide a YouTube URL or a search query.'}
@@ -129,14 +193,29 @@ class QueueService:
             existing = queue_repo.get_pending_by_video_id(video_id=video_info['video_id'], user_id=user_id, session_id=session_id)
             if existing:
                 return {'success': False, 'error': 'This video is already in the queue. Choose another one.'}
-            max_position = queue_repo.count_pending(user_id=user_id, session_id=session_id)
+            pending_items = queue_repo.get_pending_queue(user_id=user_id, session_id=session_id)
+            max_position = len(pending_items)
+            insert_position = max_position + 1
+            if priority_next:
+                insert_position = 2 if max_position > 0 else 1
+                for item in pending_items:
+                    if item.position >= insert_position:
+                        item.position += 1
+                db.flush()
+            resolved_requester_name = self._resolve_requester_name(
+                user_id=user_id,
+                platform=platform,
+                requester_name=requester_name,
+                requester_id=requester_id,
+                db=db,
+            )
             if is_paid and points_cost:
-                points_result = await self._deduct_points(user_id, requester_id, requester_name, platform, channel_name, points_cost, f"Song request: {video_info['title']}", db)
+                points_result = await self._deduct_points(user_id, requester_id, resolved_requester_name, platform, channel_name, points_cost, f"Song request: {video_info['title']}", db)
                 if not points_result['success']:
                     return points_result
-            queue_item = YouTubeQueue(user_id=user_id, session_id=session_id, video_url=video_url, video_id=video_info['video_id'], title=video_info['title'], duration=video_info['duration'], thumbnail_url=video_info['thumbnail_url'], channel_name=channel_name, platform=platform, requester_name=requester_name, requester_id=requester_id, position=max_position + 1, is_paid=is_paid, points_cost=points_cost)
+            queue_item = YouTubeQueue(user_id=user_id, session_id=session_id, video_url=video_url, video_id=video_info['video_id'], title=video_info['title'], duration=video_info['duration'], thumbnail_url=video_info['thumbnail_url'], channel_name=channel_name, platform=platform, requester_name=resolved_requester_name, requester_id=requester_id, position=insert_position, is_paid=is_paid, points_cost=points_cost, paid_source=paid_source, paid_amount=paid_amount, paid_currency=paid_currency, source_alert_id=source_alert_id)
             queue_item = queue_repo.add_item(queue_item)
-            logger.info(f"Added video to queue: {video_info['title']} by {requester_name}")
+            logger.info(f"Added video to queue: {video_info['title']} by {resolved_requester_name}")
             if self.connection_manager:
                 try:
                     if queue_item.position == 1:
@@ -146,7 +225,7 @@ class QueueService:
                 except Exception:
                     logger.exception('Error sending YouTube OBS command')
             await self._broadcast_queue_update(user_id)
-            return {'success': True, 'video_info': video_info, 'queue_item': {'id': queue_item.id, 'title': queue_item.title, 'duration': queue_item.duration, 'position': queue_item.position, 'requester': queue_item.requester_name, 'is_paid': queue_item.is_paid, 'points_cost': queue_item.points_cost}}
+            return {'success': True, 'video_info': video_info, 'queue_item': {'id': queue_item.id, 'title': queue_item.title, 'duration': queue_item.duration, 'position': queue_item.position, 'requester': queue_item.requester_name, 'requester_name': queue_item.requester_name, 'is_paid': queue_item.is_paid, 'points_cost': queue_item.points_cost, 'paid_source': queue_item.paid_source, 'paid_amount': queue_item.paid_amount, 'paid_currency': queue_item.paid_currency, 'source_alert_id': queue_item.source_alert_id}}
         except Exception:
             db.rollback()
             logger.exception('Error adding video to queue')
@@ -194,7 +273,7 @@ class QueueService:
             queue_items = queue_repo.get_pending_queue(user_id=user_id, session_id=session_id)
             result = []
             for item in queue_items:
-                result.append({'id': item.id, 'video_id': item.video_id, 'title': item.title, 'duration': item.duration, 'thumbnail_url': item.thumbnail_url, 'url': item.video_url, 'channel_name': item.channel_name, 'platform': item.platform, 'requester_name': item.requester_name, 'position': item.position, 'is_paid': item.is_paid, 'points_cost': item.points_cost, 'added_at': item.added_at.isoformat() if item.added_at else None})
+                result.append({'id': item.id, 'video_id': item.video_id, 'title': item.title, 'duration': item.duration, 'thumbnail_url': item.thumbnail_url, 'url': item.video_url, 'channel_name': item.channel_name, 'platform': item.platform, 'requester_name': item.requester_name, 'position': item.position, 'is_paid': item.is_paid, 'points_cost': item.points_cost, 'paid_source': item.paid_source, 'paid_amount': item.paid_amount, 'paid_currency': item.paid_currency, 'source_alert_id': item.source_alert_id, 'added_at': item.added_at.isoformat() if item.added_at else None, 'played_at': item.played_at.isoformat() if item.played_at else None})
             return result
         except Exception:
             logger.exception('Error getting queue')

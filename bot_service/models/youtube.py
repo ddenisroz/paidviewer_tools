@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String
 
 from models.base import Base
 
@@ -35,5 +35,9 @@ class YouTubeQueue(Base):
     status = Column(String, nullable=False, default="pending")
     is_paid = Column(Boolean, default=False)
     points_cost = Column(Integer, nullable=True)
+    paid_source = Column(String, nullable=True)
+    paid_amount = Column(Float, nullable=True)
+    paid_currency = Column(String, nullable=True)
+    source_alert_id = Column(String, nullable=True, index=True)
     added_at = Column(DateTime, default=datetime.utcnow, index=True)
     played_at = Column(DateTime, nullable=True)

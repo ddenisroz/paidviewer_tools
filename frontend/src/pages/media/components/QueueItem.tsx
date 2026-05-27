@@ -49,8 +49,10 @@ const QueueItem: React.FC<QueueItemProps> = ({
 
     const isRowClickable = Boolean(onPlay && !isPlaying);
     const gridClasses = compact
-        ? 'grid grid-cols-[28px_minmax(0,1fr)_72px]'
-        : 'grid grid-cols-[28px_minmax(0,1fr)_64px_72px]';
+        ? 'grid grid-cols-[32px_minmax(0,1fr)_minmax(120px,0.8fr)_88px]'
+        : 'grid grid-cols-[32px_minmax(0,1fr)_160px_96px_96px]';
+    const requesterName = video.requester_name || video.added_by || 'Unknown';
+    const youtubeUrl = video.url || `https://www.youtube.com/watch?v=${video.video_id}`;
 
     const handleRowClick = (): void => {
         if (isRowClickable) {
@@ -114,41 +116,59 @@ const QueueItem: React.FC<QueueItemProps> = ({
                             {video.title}
                         </span>
                     </div>
+                    <div className="min-w-0 truncate text-xs text-muted-foreground">{requesterName}</div>
                 </>
             ) : (
                 <>
                     {/* Thumbnail & Title */}
-                    <div className="min-w-0 flex items-center gap-3">
-                        <div className="relative shrink-0 rounded overflow-hidden w-16 h-9 bg-muted">
+                    <a
+                        href={youtubeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-w-0 flex items-center gap-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="relative h-9 w-16 shrink-0 overflow-hidden rounded bg-muted">
                             <img
                                 src={video.thumbnail || video.thumbnail_url}
                                 alt={video.title}
-                                className="w-full h-full object-cover"
+                                className="h-full w-full object-cover"
                                 loading="lazy"
                             />
                         </div>
-                        <div className="flex flex-col min-w-0">
+                        <div className="flex min-w-0 flex-col">
                             <span
                                 className={cn(
-                                    'font-medium text-sm truncate pr-4',
+                                    'truncate pr-4 text-sm font-medium hover:text-blue-300',
                                     isPlaying ? 'text-primary' : 'text-foreground'
                                 )}
                             >
                                 {video.title}
                             </span>
-                            <span className="text-xs text-muted-foreground truncate">
+                            <span className="truncate text-xs text-muted-foreground">
                                 {video.channel_name || 'YouTube'}
                             </span>
+                            {(video.is_paid || video.paid_source) && (
+                                <span className="mt-0.5 w-fit rounded bg-amber-400/14 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-200">
+                                    Paid video
+                                </span>
+                            )}
                         </div>
+                    </a>
+
+                    <div className="min-w-0 truncate text-center text-xs text-muted-foreground justify-self-center">
+                        {requesterName}
                     </div>
 
                     {/* Duration */}
-                    <div className="flex w-full justify-center text-xs font-mono text-muted-foreground">{duration}</div>
+                    <div className="flex w-full justify-center text-xs font-mono text-muted-foreground">
+                        {duration}
+                    </div>
                 </>
             )}
 
             {/* Actions */}
-            <div className="flex w-full items-center justify-center gap-2">
+            <div className="flex w-full items-center justify-center gap-1.5 justify-self-center">
                 {/* Skip button - for currently playing */}
                 {!compact && isPlaying && onSkip && (
                     <Tooltip>

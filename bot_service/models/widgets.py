@@ -38,7 +38,6 @@ class ChatBoxSettings(Base):
     show_platform_icons = Column(Boolean, default=True)
     show_roles = Column(Boolean, default=False)
     show_badges = Column(Boolean, default=True)
-    show_avatars = Column(Boolean, default=False)
 
     # Text colors.
     text_color = Column(String, default="#FFFFFF")
@@ -55,6 +54,8 @@ class ChatBoxSettings(Base):
     show_7tv_emotes = Column(Boolean, default=True)
     show_links = Column(Boolean, default=True)
     auto_load_images = Column(Boolean, default=True)
+    separate_message_backgrounds = Column(Boolean, default=True)
+    message_background_mode = Column(String, default="message")
 
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)

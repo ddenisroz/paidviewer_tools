@@ -111,9 +111,16 @@ async def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user
 
 def create_jwt_token(user_id: int, token_type: str = "obs") -> str:
     """Create a long-lived JWT token for OBS/widgets."""
-    from datetime import timedelta
+    from datetime import datetime, timedelta, timezone
+    import secrets
 
-    data = {"user_id": user_id, "type": token_type}
+    data = {
+        "user_id": user_id,
+        "type": token_type,
+        "scope": token_type,
+        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "jti": secrets.token_urlsafe(16),
+    }
     expires_delta = timedelta(days=365)
     return security_manager.create_access_token(data, expires_delta)
 

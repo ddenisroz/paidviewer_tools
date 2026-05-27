@@ -116,19 +116,30 @@ export const MemeAlertsHistoryCard: React.FC<MemeAlertsHistoryCardProps> = ({
     );
 };
 
+const normalizeHistoryName = (value?: string | number | null): string | null => {
+    const text = String(value ?? '').trim();
+    if (!text || /^\d+$/.test(text)) return null;
+    return text;
+};
+
 const MemeAlertsHistoryRow: React.FC<{ item: MemeAlertsHistoryItem }> = ({ item }) => {
-    const platformName = item.platform_user_name || item.user_name || 'Пользователь';
-    const memealertsName = item.memealerts_name || item.user_name || 'MemeAlerts';
+    const isManual = item.source === 'ui' || item.type === 'ui';
+    const platformName = normalizeHistoryName(item.platform_user_name);
+    const userName = normalizeHistoryName(item.user_name);
+    const memealertsName = normalizeHistoryName(item.memealerts_name) || userName || 'MemeAlerts';
+    const primaryName = isManual ? platformName : platformName || userName || 'Пользователь';
+    const showPrimaryName = Boolean(primaryName && primaryName !== memealertsName);
+
     return (
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-lg border border-border/70 bg-card/70 px-3 py-2">
             <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">{platformName}</p>
+                {showPrimaryName ? <p className="truncate text-sm font-semibold text-foreground">{primaryName}</p> : null}
                 <p className="truncate text-xs text-muted-foreground">MemeAlerts: {memealertsName}</p>
                 <p className="text-[11px] text-muted-foreground">
                     {getSourceLabel(item.source, item.type)} · {formatMemeAlertsTimestamp(item.created_at)}
                 </p>
             </div>
-            <p className="text-sm font-semibold text-emerald-300">+{formatMemeAlertsAmount(item.amount)}</p>
+            {isManual ? null : <p className="text-sm font-semibold text-emerald-300">+{formatMemeAlertsAmount(item.amount)}</p>}
         </div>
     );
 };

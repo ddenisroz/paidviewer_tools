@@ -8,7 +8,7 @@ const EMOTES_CACHE_TTL_MS = 15 * 60 * 1000;
 const EMPTY_CACHE_TTL_MS = 90 * 1000;
 const INLINE_EMOTE_CLASS = 'chat-inline-emote';
 
-interface EmoteData {
+export interface EmoteData {
     id: string;
     name: string;
     url: string;
@@ -36,7 +36,34 @@ interface Emote {
     data: EmoteDataField;
 }
 
-type EmoteMap = Map<string, EmoteData>;
+export type EmoteMap = Map<string, EmoteData>;
+
+export const SEVENTV_FALLBACK_EMOTES: EmoteData[] = [
+    {
+        id: '01KRN36SDPJ4FJ30EA2XDMQMY2',
+        name: 'HYPE',
+        url: 'https://cdn.7tv.app/emote/01KRN36SDPJ4FJ30EA2XDMQMY2/4x.webp',
+        animated: true,
+    },
+    {
+        id: '01KQJHKKN4049035GPNSK9W7QB',
+        name: 'JustAnotherDay',
+        url: 'https://cdn.7tv.app/emote/01KQJHKKN4049035GPNSK9W7QB/4x.webp',
+        animated: false,
+    },
+    {
+        id: '01KJR2MTWYRBJVCS5H5WEK9VN1',
+        name: 'Obsent',
+        url: 'https://cdn.7tv.app/emote/01KJR2MTWYRBJVCS5H5WEK9VN1/4x.webp',
+        animated: false,
+    },
+    {
+        id: '01GHQ9FYY8000A4BTSHDYK8Z2H',
+        name: 'imNOTcrying',
+        url: 'https://cdn.7tv.app/emote/01GHQ9FYY8000A4BTSHDYK8Z2H/4x.webp',
+        animated: false,
+    },
+];
 
 const emotesCache = new Map<string, EmoteMap>();
 const emotesCacheExpiry = new Map<string, number>();
@@ -74,6 +101,16 @@ function setCachedEmotes(cacheKey: string, data: EmoteMap): void {
     const ttl = data.size > 0 ? EMOTES_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS;
     emotesCache.set(cacheKey, data);
     emotesCacheExpiry.set(cacheKey, Date.now() + ttl);
+}
+
+export function registerEmoteAliases(target: EmoteMap, emote: EmoteData): void {
+    const aliases = new Set([
+        emote.name,
+        emote.name.toLowerCase(),
+        `:${emote.name}:`,
+        `:${emote.name.toLowerCase()}:`,
+    ]);
+    aliases.forEach((alias) => target.set(alias, emote));
 }
 
 async function runWithInFlightDedup(cacheKey: string, loader: () => Promise<EmoteMap>): Promise<EmoteMap> {
@@ -129,7 +166,7 @@ async function resolveFirstNonEmptyEmotes(fetchers: Array<() => Promise<EmoteMap
     });
 }
 
-function proxy7tvUrl(url: string | undefined): string | undefined {
+export function proxy7tvUrl(url: string | undefined): string | undefined {
     try {
         if (!url || url.includes('/api/proxy/7tv/')) {
             return url;
@@ -141,6 +178,13 @@ function proxy7tvUrl(url: string | undefined): string | undefined {
         logger.error('Error proxying 7TV URL:', error);
         return url;
     }
+}
+
+export function getSevenTvFallbackEmotes(): EmoteData[] {
+    return SEVENTV_FALLBACK_EMOTES.map((emote) => ({
+        ...emote,
+        url: proxy7tvUrl(emote.url) ?? emote.url,
+    }));
 }
 
 function normalizeHostUrl(hostUrl: string | undefined): string | undefined {
@@ -178,8 +222,7 @@ function buildEmoteMap(emotes: Array<Emote | Record<string, unknown>>): EmoteMap
                 url,
                 animated: !!data?.animated,
             };
-            emotesMap.set(emoteName, entry);
-            emotesMap.set(emoteName.toLowerCase(), entry);
+            registerEmoteAliases(emotesMap, entry);
         }
     });
     return emotesMap;
@@ -289,6 +332,7 @@ export async function getGlobalEmotes(): Promise<EmoteMap> {
             const emotesMap = await resolveFirstNonEmptyEmotes(
                 globalEndpoints.map((endpoint) => () => fetchEmotesFromSetEndpoint(endpoint))
             );
+            getSevenTvFallbackEmotes().forEach((emote) => registerEmoteAliases(emotesMap, emote));
 
             emotesMap.forEach((value) => {
                 if (value.url) {

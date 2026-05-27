@@ -24,12 +24,14 @@ interface MessageContentProps {
     twitchEmotes?: ChatEmote[];
     showLinks?: boolean;
     autoLoadImages?: boolean;
+    imageLoading?: 'lazy' | 'eager';
 }
 
 // Regex для URL - создаем один раз
 const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
 const INLINE_EMOTE_CLASS = 'chat-inline-emote';
+const INVISIBLE_ARTIFACT_REGEX = /[\u034f\u061c\u180e\u200b\u200c\u2060\ufeff]/g;
 const escapeHtmlAttr = (value: string): string =>
     value
         .replace(/&/g, '&amp;')
@@ -81,23 +83,31 @@ const isImageUrl = (url: string): boolean => {
     }
 };
 
-const removeUrls = (text: string): string =>
+const sanitizeTextContent = (text: string): string =>
     text
-        .replace(URL_REGEX, '')
+        .replace(INVISIBLE_ARTIFACT_REGEX, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
+
+const normalizeRenderableUrl = (value: string): string => value.replace(INVISIBLE_ARTIFACT_REGEX, '').trim();
+const matchesUrl = (value: string): boolean => {
+    URL_REGEX.lastIndex = 0;
+    return URL_REGEX.test(value);
+};
+
+const removeUrls = (text: string): string => sanitizeTextContent(text.replace(URL_REGEX, ''));
 
 const TWITCH_TEXT_EMOTES: Record<string, { id: string; name: string }> = {
     ':)': { id: '1', name: 'Smile' },
 };
 
 // Компонент для изображения с fallback на ссылку
-const ChatImage: React.FC<{ src: string }> = memo(({ src }) => (
+const ChatImage: React.FC<{ src: string; loading?: 'lazy' | 'eager' }> = memo(({ src, loading = 'lazy' }) => (
     <span className="inline-block my-1">
         <img
             src={src}
             alt="Изображение"
-            loading="lazy"
+            loading={loading}
             className="max-w-[min(200px,45vw)] max-h-[min(200px,45vw)] rounded"
             onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -169,30 +179,38 @@ const processTwitchTextEmotes = (text: string): string => {
 };
 
 // Рендер части сообщения (текст, ссылка или картинка)
-const renderPart = (part: string, index: number, showLinks: boolean, autoLoadImages: boolean): React.ReactNode => {
-    // Проверяем, является ли часть URL
-    if (URL_REGEX.test(part)) {
-        URL_REGEX.lastIndex = 0; // Reset regex state
+const renderPart = (
+    part: string,
+    index: number,
+    showLinks: boolean,
+    autoLoadImages: boolean,
+    imageLoading: 'lazy' | 'eager'
+): React.ReactNode => {
+    const sanitizedPart = sanitizeTextContent(part);
+    const normalizedUrl = normalizeRenderableUrl(part);
 
+    // Проверяем, является ли часть URL
+    if (matchesUrl(normalizedUrl)) {
         if (!showLinks) {
             return null;
         }
 
-        if (autoLoadImages && isImageUrl(part)) {
-            return <ChatImage key={index} src={part} />;
+        if (autoLoadImages && isImageUrl(normalizedUrl)) {
+            return <ChatImage key={index} src={normalizedUrl} loading={imageLoading} />;
         }
 
-        return <ChatLink key={index} href={part} />;
+        return <ChatLink key={index} href={normalizedUrl} />;
     }
 
-    return <span key={index}>{part}</span>;
+    return sanitizedPart ? <span key={index}>{sanitizedPart}</span> : null;
 };
 
 // Рендер сообщения с эмодзи
 const renderMessageWithEmotes = (
     processedMessage: string,
     showLinks: boolean,
-    autoLoadImages: boolean
+    autoLoadImages: boolean,
+    imageLoading: 'lazy' | 'eager'
 ): React.ReactNode[] => {
     // Разбиваем по тегам img
     const parts = processedMessage.split(/(<img[^>]*\/>)/);
@@ -223,7 +241,7 @@ const renderMessageWithEmotes = (
                             objectFit: 'contain',
                             marginInline: '0.1em',
                         }}
-                        loading="lazy"
+                        loading={imageLoading}
                         onError={(e) => {
                             const target = e.currentTarget;
                             if (tryVkAssetFallback(target)) return;
@@ -238,8 +256,8 @@ const renderMessageWithEmotes = (
         }
 
         // Проверяем на URL внутри текстовой части
-        if (URL_REGEX.test(part)) {
-            URL_REGEX.lastIndex = 0;
+        if (matchesUrl(part)) {
+            const normalizedPartUrl = normalizeRenderableUrl(part);
 
             if (!showLinks) {
                 const removedText = removeUrls(part);
@@ -249,34 +267,50 @@ const renderMessageWithEmotes = (
             // Если часть содержит URL внутри текста, разбиваем её дополнительно.
 
             // Упрощение: если часть - это чистый URL
-            if (part.match(URL_REGEX) && part.match(URL_REGEX)![0] === part) {
-                if (autoLoadImages && isImageUrl(part)) {
-                    return <ChatImage key={index} src={part} />;
+            if (/^https?:\/\/\S+$/i.test(normalizedPartUrl)) {
+                if (autoLoadImages && isImageUrl(normalizedPartUrl)) {
+                    return <ChatImage key={index} src={normalizedPartUrl} loading={imageLoading} />;
                 }
-                return <ChatLink key={index} href={part} />;
+                return <ChatLink key={index} href={normalizedPartUrl} />;
             }
 
             // Если URL внутри текста - используем регулярку для split
             const subParts = part.split(URL_REGEX);
             return subParts.map((subPart, subIndex) => {
-                if (URL_REGEX.test(subPart)) {
-                    URL_REGEX.lastIndex = 0;
+                const normalizedSubPartUrl = normalizeRenderableUrl(subPart);
+                if (matchesUrl(normalizedSubPartUrl)) {
                     if (!showLinks) return null;
-                    if (autoLoadImages && isImageUrl(subPart))
-                        return <ChatImage key={`${index}-${subIndex}`} src={subPart} />;
-                    return <ChatLink key={`${index}-${subIndex}`} href={subPart} />;
+                    if (autoLoadImages && isImageUrl(normalizedSubPartUrl))
+                        return (
+                            <ChatImage
+                                key={`${index}-${subIndex}`}
+                                src={normalizedSubPartUrl}
+                                loading={imageLoading}
+                            />
+                        );
+                    return <ChatLink key={`${index}-${subIndex}`} href={normalizedSubPartUrl} />;
                 }
-                return <span key={`${index}-${subIndex}`}>{subPart}</span>;
+                const sanitizedSubPart = sanitizeTextContent(subPart);
+                return sanitizedSubPart ? <span key={`${index}-${subIndex}`}>{sanitizedSubPart}</span> : null;
             });
         }
 
         // Обычный текст рендерим как text node (React экранирует сам)
-        return <span key={index}>{part}</span>;
+        const sanitizedPart = sanitizeTextContent(part);
+        return sanitizedPart ? <span key={index}>{sanitizedPart}</span> : null;
     });
 };
 
 const MessageContent: React.FC<MessageContentProps> = memo(
-    ({ message, channelEmotes, globalEmotes, twitchEmotes, showLinks = true, autoLoadImages = true }) => {
+    ({
+        message,
+        channelEmotes,
+        globalEmotes,
+        twitchEmotes,
+        showLinks = true,
+        autoLoadImages = true,
+        imageLoading = 'lazy',
+    }) => {
         // Мемоизация обработки сообщения
         const content = useMemo(() => {
             if (!message) return null;
@@ -300,7 +334,7 @@ const MessageContent: React.FC<MessageContentProps> = memo(
             if (withEmotes.includes('<img')) {
                 return (
                     <span className="chat-message-content break-words">
-                        {renderMessageWithEmotes(withEmotes, showLinks, autoLoadImages)}
+                        {renderMessageWithEmotes(withEmotes, showLinks, autoLoadImages, imageLoading)}
                     </span>
                 );
             }
@@ -317,13 +351,13 @@ const MessageContent: React.FC<MessageContentProps> = memo(
                 <span className="chat-message-content break-words">
                     {parts.map((part, index) => (
                         <span key={index} className="align-middle">
-                            {renderPart(part, index, showLinks, autoLoadImages)}
-                            {index < parts.length - 1 ? ' ' : ''}
+                            {renderPart(part, index, showLinks, autoLoadImages, imageLoading)}
+                            {index < parts.length - 1 && sanitizeTextContent(part) ? ' ' : ''}
                         </span>
                     ))}
                 </span>
             );
-        }, [message, channelEmotes, globalEmotes, twitchEmotes, showLinks, autoLoadImages]);
+        }, [message, channelEmotes, globalEmotes, twitchEmotes, showLinks, autoLoadImages, imageLoading]);
 
         return content;
     }

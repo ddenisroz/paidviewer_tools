@@ -199,7 +199,9 @@ class NotificationService:
             db = SessionLocal()
             try:
                 user = db.query(User).filter(User.id == user_id).first()
-                obs_token = getattr(user, "obs_token", None) if user else None
+                obs_token = getattr(user, "tts_source_token", None) if user else None
+                if not obs_token and user:
+                    obs_token = getattr(user, "obs_token", None)
             finally:
                 db.close()
 

@@ -50,6 +50,8 @@ interface TtsPlayerContextValue {
     addToQueue: (item: Omit<TtsQueueItem, 'id' | 'timestamp' | 'status'>) => void;
     clearQueue: () => void;
     skipCurrent: () => void;
+    startPlayback: () => void;
+    stopPlayback: () => void;
     playFromQueue: (index: number) => void;
     togglePause: () => void;
     requestPrimaryPlayerTab: () => void;
@@ -103,7 +105,7 @@ const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
 const getObsDockToken = (search: string): string | null => {
     if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(search);
-    const token = (params.get('obs_token') || params.get('token') || '').trim();
+    const token = (params.get('dock_token') || params.get('obs_token') || params.get('token') || '').trim();
     return token || null;
 };
 
@@ -155,6 +157,15 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     const authContext = useContext(AuthContext);
     const isAuthenticated = Boolean(authContext?.isAuthenticated);
     const user = authContext?.user ?? null;
+    const isTokenObsDock = Boolean(obsDockToken && location.pathname === '/tts/obs-dock');
+
+    const sendDockControlCommand = useCallback((command: 'start' | 'stop' | 'skip' | 'clear'): void => {
+        const socket = presenceWebSocketRef.current;
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+            return;
+        }
+        socket.send(JSON.stringify({ type: 'tts_control', command }));
+    }, []);
 
     const invalidatePlaybackRequests = useCallback(() => {
         playbackRequestIdRef.current += 1;
@@ -464,7 +475,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 return;
             }
 
-            if (listeningModeRef.current !== 'website') {
+            if (listeningModeRef.current !== 'website' && !isTokenObsDock) {
                 return;
             }
 
@@ -489,7 +500,9 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             const nextQueue = [...queueRef.current, newItem];
             queueRef.current = nextQueue;
             setQueue(nextQueue);
-            window.setTimeout(() => playNextRef.current?.(), 0);
+            if (listeningModeRef.current === 'website') {
+                window.setTimeout(() => playNextRef.current?.(), 0);
+            }
             logger.info('[TTS Player] Enqueued socket audio', {
                 trace_id: newItem.traceId,
                 source_message_id: newItem.sourceMessageId,
@@ -499,7 +512,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 original_text: newItem.originalText,
             });
         },
-        [resolveAudioUrl, upsertLiveMessageStatus]
+        [isTokenObsDock, resolveAudioUrl, upsertLiveMessageStatus]
     );
 
     const addLiveChatMessage = useCallback(
@@ -922,6 +935,13 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     ]);
 
     useEffect(() => {
+        if (isTokenObsDock) {
+            setListeningMode('obs');
+            listeningModeRef.current = 'obs';
+        }
+    }, [isTokenObsDock]);
+
+    useEffect(() => {
         if (!isAuthenticated || listeningMode !== 'website' || !isPrimaryPlayerTab) {
             return;
         }
@@ -1144,6 +1164,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         playNextRef.current = playNext;
     }, [playNext]);
     const clearQueue = useCallback(() => {
+        sendDockControlCommand('clear');
         invalidatePlaybackRequests();
         stopActivePlayback();
 
@@ -1153,7 +1174,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         setIsPlaying(false);
         setIsPaused(false);
         logger.info('[DELETE] [TTS Player] Queue cleared');
-    }, [invalidatePlaybackRequests, stopActivePlayback]);
+    }, [invalidatePlaybackRequests, sendDockControlCommand, stopActivePlayback]);
 
     useEffect(() => {
         if (!ttsEnabled) {
@@ -1188,10 +1209,10 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     }, [queue.length, isPlaying, currentItem, ttsEnabled, listeningMode, isPrimaryPlayerTab, isAudioUnlocked, playNext]);
 
     useEffect(() => {
-        if (listeningMode !== 'website') {
+        if (listeningMode !== 'website' && !isTokenObsDock) {
             clearQueue();
         }
-    }, [listeningMode, clearQueue]);
+    }, [listeningMode, clearQueue, isTokenObsDock]);
 
     const addToQueue = useCallback((item: Omit<TtsQueueItem, 'id' | 'timestamp' | 'status'>) => {
         if (!ttsEnabledRef.current) {
@@ -1223,6 +1244,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     }, []);
 
     const skipCurrent = useCallback(() => {
+        sendDockControlCommand('skip');
         if (currentItem) {
             upsertLiveMessageStatus(
                 {
@@ -1243,7 +1265,14 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         setIsPaused(false);
         setTimeout(() => playNext(), 100);
         logger.info('[SKIP] [TTS Player] Skipped current item');
-    }, [currentItem, invalidatePlaybackRequests, playNext, stopActivePlayback, upsertLiveMessageStatus]);
+    }, [
+        currentItem,
+        invalidatePlaybackRequests,
+        playNext,
+        sendDockControlCommand,
+        stopActivePlayback,
+        upsertLiveMessageStatus,
+    ]);
 
     const playFromQueue = useCallback(
         (index: number) => {
@@ -1270,6 +1299,13 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     );
 
     const togglePause = useCallback(() => {
+        if (isTokenObsDock) {
+            sendDockControlCommand(isPaused ? 'start' : 'stop');
+            setIsPaused((value) => !value);
+            setIsPlaying((value) => !value);
+            return;
+        }
+
         if (!currentItem) return;
 
         const handlePause = async () => {
@@ -1308,7 +1344,36 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         };
 
         void handlePause();
-    }, [currentItem]);
+    }, [currentItem, isPaused, isTokenObsDock, sendDockControlCommand]);
+
+    const startPlayback = useCallback(() => {
+        if (isTokenObsDock) {
+            sendDockControlCommand('start');
+            setIsPaused(false);
+            setIsPlaying(true);
+            return;
+        }
+
+        if (isPaused && currentItem) {
+            togglePause();
+            return;
+        }
+        window.setTimeout(() => playNextRef.current?.(), 0);
+    }, [currentItem, isPaused, isTokenObsDock, sendDockControlCommand, togglePause]);
+
+    const stopPlayback = useCallback(() => {
+        if (isTokenObsDock) {
+            sendDockControlCommand('stop');
+            setIsPaused(true);
+            setIsPlaying(false);
+            return;
+        }
+
+        if (!currentItem) return;
+        if (!isPaused) {
+            togglePause();
+        }
+    }, [currentItem, isPaused, isTokenObsDock, sendDockControlCommand, togglePause]);
 
     const value: TtsPlayerContextValue = {
         queue,
@@ -1322,6 +1387,8 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         addToQueue,
         clearQueue,
         skipCurrent,
+        startPlayback,
+        stopPlayback,
         playFromQueue,
         togglePause,
         requestPrimaryPlayerTab,

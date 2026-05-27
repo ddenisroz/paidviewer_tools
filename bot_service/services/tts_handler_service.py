@@ -39,6 +39,13 @@ from core.analysis_logging import (
 
 logger = logging.getLogger('bot_service.tts')
 
+
+def _safe_log_text_preview(text: str, limit: int = 50) -> str:
+    preview = str(text or "")[:limit]
+    if len(str(text or "")) > limit:
+        preview = f"{preview}..."
+    return preview.encode("unicode_escape", errors="backslashreplace").decode("ascii")
+
 class TTSHandlerService:
     """
     Service for handling TTS logic including permissions, settings, and request queuing.
@@ -287,10 +294,10 @@ class TTSHandlerService:
     def _check_initial_conditions(self, text, username, channel_identifier, platform, connection_manager, skip_if_command):
         # Skip commands
         if skip_if_command and text.strip().startswith('!'):
-            logger.info(f"[SKIP] [{platform.upper()} TTS] Skipping command: {text[:50]}")
+            logger.info("[SKIP] [%s TTS] Skipping command: %s", platform.upper(), _safe_log_text_preview(text))
             return {"success": False, "error": "Message is a command"}
 
-        logger.info(f"[MIC] [{platform.upper()} TTS] Processing message for TTS: '{text[:50]}...'")
+        logger.info("[MIC] [%s TTS] Processing message for TTS: %s", platform.upper(), _safe_log_text_preview(text))
 
         if not connection_manager:
             logger.warning(f"[WARN] [{platform.upper()} TTS] No connection_manager, will check user settings")
@@ -332,7 +339,7 @@ class TTSHandlerService:
         """
         Ensure active sink exists before synthesis:
         - website mode -> requires active `tts_player` websocket
-        - obs mode -> requires active OBS socket for user's obs_token
+        - obs mode -> requires active OBS audio-source socket.
         """
         user = user_data["user"]
         user_id = user_data["user_id"]
@@ -356,12 +363,15 @@ class TTSHandlerService:
             return {"success": False, "error": "No active TTS player sink"}
 
         if listening_mode == "obs":
-            obs_token = getattr(user, "obs_token", None)
+            source_token = getattr(user, "tts_source_token", None)
+            legacy_token = getattr(user, "obs_token", None)
+            obs_connections = getattr(connection_manager, "obs_connections", None) if connection_manager else None
             has_obs_sink = bool(
-                obs_token
-                and connection_manager
-                and getattr(connection_manager, "obs_connections", None)
-                and obs_token in connection_manager.obs_connections
+                obs_connections
+                and (
+                    (source_token and source_token in obs_connections)
+                    or (legacy_token and legacy_token in obs_connections)
+                )
             )
             if has_obs_sink:
                 return None
@@ -584,9 +594,13 @@ class TTSHandlerService:
              tts_settings_dict["voice_settings"] = engine_config["voice_settings"]
 
         logger.info(
-            f"[MIC] [{platform.upper()} TTS] Processing: {username}: {text[:50]}... "
-            f"(engine={tts_settings.engine}, provider={engine_config.get('advanced_provider')}, "
-            f"volume={engine_config['volume']}%)"
+            "[MIC] [%s TTS] Processing: %s: %s (engine=%s, provider=%s, volume=%s%%)",
+            platform.upper(),
+            username,
+            _safe_log_text_preview(text),
+            tts_settings.engine,
+            engine_config.get('advanced_provider'),
+            engine_config['volume'],
         )
         logger.info(
             "[TRACE] [%s TTS] trace_id=%s source_message_id=%s original_text=%r filtered_text=%r",

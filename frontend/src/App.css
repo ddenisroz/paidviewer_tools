@@ -7,9 +7,8 @@
 
 /*
  * Dashboard responsive contract:
- * tight < 960px, compact 960-1279px, wide >= 1280px.
- * New dashboard surfaces should preserve their desktop composition across
- * these three tiers instead of adding extra sm/md/lg/xl structural jumps.
+ * Main content keeps the simplified tiered spacing, while sidebar width
+ * preserves the older compact-to-wide behavior users already know.
  */
 @layer utilities {
     .pv-dashboard-layout {
@@ -31,9 +30,9 @@
         }
     }
 
-    @media (min-width: 1280px) {
+    @media (min-width: 1440px) {
         .pv-dashboard-layout {
-            --pv-sidebar-width: 304px;
+            --pv-sidebar-width: 248px;
             --pv-dashboard-padding: 1.5rem;
             --pv-dashboard-gap: 1.5rem;
             --pv-page-padding-x: 1.5rem;
@@ -644,6 +643,16 @@ body.app-ready {
 
 #root {
     min-height: 100vh;
+}
+
+html.pv-overlay-route,
+body.pv-overlay-route,
+body.pv-overlay-route #root {
+    background: transparent !important;
+}
+
+body.pv-overlay-route {
+    overflow: hidden;
 }
 
 @keyframes fade-in {

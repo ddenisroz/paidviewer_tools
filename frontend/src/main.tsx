@@ -1,5 +1,5 @@
 /* eslint-disable import/order */
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import ReactDOM from 'react-dom/client';
@@ -72,6 +72,15 @@ const ConditionalContextWrapper: React.FC<ConditionalContextWrapperProps> = ({ c
         location.pathname.startsWith('/tts-obs') ||
         location.pathname.startsWith('/youtube-obs') ||
         location.pathname.startsWith('/drops-widget');
+
+    useEffect(() => {
+        document.documentElement.classList.toggle('pv-overlay-route', isOverlayRoute);
+        document.body.classList.toggle('pv-overlay-route', isOverlayRoute);
+        return () => {
+            document.documentElement.classList.remove('pv-overlay-route');
+            document.body.classList.remove('pv-overlay-route');
+        };
+    }, [isOverlayRoute]);
 
     if (location.pathname.startsWith('/tts/obs-dock')) {
         return <TtsDockProviders>{children}</TtsDockProviders>;

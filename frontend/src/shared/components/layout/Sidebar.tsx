@@ -166,7 +166,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                     if (preloader) preloader();
                 }}
                 className={() =>
-                    `group relative flex w-full items-center gap-2 whitespace-nowrap rounded-none px-4 py-2.5 text-[0.95rem] transition-colors app-nav-text min-[1280px]:gap-3 min-[1280px]:text-[1rem] ${
+                    `group relative flex w-full items-center gap-2 whitespace-nowrap rounded-none px-4 py-2.5 text-[0.95rem] transition-colors app-nav-text min-[1440px]:gap-3 min-[1440px]:text-[1rem] ${
                         isSubItemActive
                             ? 'bg-blue-500/20 text-blue-200'
                             : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
@@ -184,7 +184,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
         return (
             <div className="relative group" onMouseEnter={handleMouseEnter} onMouseLeave={() => setOpenSection(null)}>
                 <div
-                    className={`relative w-full cursor-pointer px-0 py-3 text-[0.95rem] transition-colors app-nav-text min-[1280px]:py-2.5 min-[1280px]:text-[1rem] ${
+                    className={`relative w-full cursor-pointer px-0 py-3 text-[0.95rem] transition-colors app-nav-text min-[1440px]:py-2.5 min-[1440px]:text-[1rem] ${
                         isParentActive || isOpen
                             ? 'bg-blue-500/20 text-blue-200'
                             : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
@@ -200,12 +200,12 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                     {isParentActive && !isOpen && (
                         <div className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-blue-300/95" />
                     )}
-                    <div className="pointer-events-none flex items-center justify-center gap-3 px-4 min-[1280px]:justify-between min-[1280px]:gap-3">
-                        <div className="flex min-w-0 items-center justify-center gap-0 min-[1280px]:justify-start min-[1280px]:gap-3">
+                    <div className="pointer-events-none flex items-center justify-center gap-3 px-4 min-[1440px]:justify-between min-[1440px]:gap-3">
+                        <div className="flex min-w-0 items-center justify-center gap-0 min-[1440px]:justify-start min-[1440px]:gap-3">
                             <item.icon className="h-5 w-5 flex-shrink-0" strokeWidth={1.8} />
-                            <span className="hidden truncate leading-5 min-[1280px]:inline">{item.label}</span>
+                            <span className="hidden truncate leading-5 min-[1440px]:inline">{item.label}</span>
                         </div>
-                        <ChevronRight className={`hidden h-4 w-4 transition-opacity min-[1280px]:block ${isOpen ? 'opacity-100' : 'opacity-40'}`} strokeWidth={2} />
+                        <ChevronRight className={`hidden h-4 w-4 transition-opacity min-[1440px]:block ${isOpen ? 'opacity-100' : 'opacity-40'}`} strokeWidth={2} />
                     </div>
                 </div>
 
@@ -238,7 +238,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 }
             }}
             className={({ isActive }) =>
-                `relative flex w-full items-center justify-center gap-0 rounded-none px-0 py-3 text-[0.95rem] transition-colors app-nav-text min-[1280px]:justify-start min-[1280px]:gap-3 min-[1280px]:px-4 min-[1280px]:py-2.5 min-[1280px]:text-[1rem] ${
+                `relative flex w-full items-center justify-center gap-0 rounded-none px-0 py-3 text-[0.95rem] transition-colors app-nav-text min-[1440px]:justify-start min-[1440px]:gap-3 min-[1440px]:px-4 min-[1440px]:py-2.5 min-[1440px]:text-[1rem] ${
                     isActive
                         ? 'bg-blue-500/20 text-blue-200'
                         : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
@@ -249,7 +249,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 className={`absolute inset-y-0 left-0 w-0.5 bg-blue-300/95 transition-opacity ${location.pathname === item.to ? 'opacity-100' : 'opacity-0'}`}
             />
             <item.icon className="h-5 w-5 flex-shrink-0" strokeWidth={1.8} />
-            <span className="hidden truncate leading-5 min-[1280px]:inline">{item.label}</span>
+            <span className="hidden truncate leading-5 min-[1440px]:inline">{item.label}</span>
         </NavLink>
     );
 };
@@ -291,15 +291,15 @@ const Sidebar: React.FC = () => {
 
     return (
         <div className="pv-dashboard-sidebar relative z-50 h-full border-r border-border/70 bg-card">
-            <div className="flex h-full max-h-screen flex-col gap-2 relative">
-                <div className="flex h-16 items-center justify-center px-2 min-[1280px]:h-[70px] min-[1280px]:justify-start min-[1280px]:px-6">
+            <div className="relative flex h-full max-h-screen flex-col gap-2">
+                <div className="flex h-16 items-center justify-center px-2 min-[1440px]:h-[68px] min-[1440px]:px-5">
                     <NavLink
                         to="/dashboard"
-                        className="flex min-w-0 items-center gap-2 font-semibold"
+                        className="flex w-full min-w-0 items-center justify-center gap-2 text-center font-semibold"
                         title="Paidviewer Tools"
                     >
-                        <span className="app-brand-title text-lg text-green-400 min-[1280px]:hidden">PV</span>
-                        <span className="app-brand-title hidden whitespace-nowrap text-[1.4rem] text-green-400 min-[1280px]:inline">
+                        <span className="app-brand-title text-lg text-green-400 min-[1440px]:hidden">PV</span>
+                        <span className="app-brand-title hidden whitespace-nowrap text-[1.25rem] text-green-400 min-[1440px]:inline">
                             Paidviewer Tools
                         </span>
                     </NavLink>
@@ -319,8 +319,8 @@ const Sidebar: React.FC = () => {
                 </div>
 
                 {/* Мини-плееры (слоты для портала) */}
-                <div className="mt-auto px-2 pb-4 overflow-visible space-y-3">
-                    <div id="youtube-mini-player-slot" className="overflow-visible" />
+                <div className="mt-auto overflow-visible space-y-3 px-3 pb-4">
+                    <div id="youtube-mini-player-slot" className="w-full overflow-visible" />
                 </div>
             </div>
         </div>

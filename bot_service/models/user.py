@@ -34,6 +34,8 @@ class User(Base):
     vk_is_moderator = Column(Boolean, default=False)
 
     obs_token = Column(String, nullable=True)
+    tts_dock_token = Column(String, nullable=True)
+    tts_source_token = Column(String, nullable=True)
     is_blocked = Column(Boolean, default=False)
     blocked_reason = Column(String, nullable=True)
     blocked_at = Column(DateTime, nullable=True)

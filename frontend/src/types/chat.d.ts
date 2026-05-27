@@ -73,6 +73,7 @@ export interface MutedUser {
  * Настройки ChatBox для OBS overlay
  */
 export interface ChatBoxSettings {
+    message_background_mode?: 'message' | 'column' | 'none';
     font_size?: number;
     font_family?: string;
     font_weight?: string;
@@ -92,10 +93,10 @@ export interface ChatBoxSettings {
     border_radius?: number;
     show_platform_icons?: boolean;
     show_badges?: boolean;
-    show_avatars?: boolean;
     show_7tv_emotes?: boolean;
     show_links?: boolean;
     auto_load_images?: boolean;
+    separate_message_backgrounds?: boolean;
     widget_url?: string;
     version?: number;
     channel_name?: string;

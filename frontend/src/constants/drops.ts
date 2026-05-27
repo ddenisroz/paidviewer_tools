@@ -26,7 +26,7 @@ export const DROPS_CONSTANTS = {
         MAX_MESSAGES_REQUIRED: 100,
     },
     WIDGET: {
-        MAX_SPINNING_MS: 2500,
+        MAX_SPINNING_MS: 5000,
         MAX_OPENING_MS: 1500,
         MAX_RESULT_MS: 7000,
     },

@@ -1,6 +1,7 @@
 from models import User
 from models.youtube import YouTubeQueue
 from services.youtube.queue_service import QueueService
+import pytest
 
 
 def _queue_item(
@@ -167,3 +168,244 @@ def test_reorder_queue_api_updates_pending_order(authenticated_client, db, test_
         "api_third_3",
         "api_second_2",
     ]
+
+
+@pytest.mark.asyncio
+async def test_paid_priority_video_takes_next_slot(db, test_user, monkeypatch):
+    async def _no_broadcast(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "services.youtube.queue_service.broadcast_youtube_queue_update",
+        _no_broadcast,
+    )
+
+    db.add_all(
+        [
+            _queue_item(
+                user_id=test_user.id,
+                video_id="currentvideo",
+                title="Current Video",
+                position=1,
+            ),
+            _queue_item(
+                user_id=test_user.id,
+                video_id="normalnext1",
+                title="Normal Next",
+                position=2,
+            ),
+            _queue_item(
+                user_id=test_user.id,
+                video_id="normallater2",
+                title="Normal Later",
+                position=3,
+            ),
+        ]
+    )
+    db.commit()
+
+    service = QueueService()
+    service.youtube_service.is_valid_youtube_url = lambda _url: True
+
+    async def _video_info(_url):
+        return {
+            "video_id": "paidvideo11",
+            "title": "Paid Video",
+            "duration": 123,
+            "thumbnail_url": "https://img.youtube.com/vi/paidvideo11/hqdefault.jpg",
+        }
+
+    service.youtube_service.get_video_info = _video_info
+
+    result = await service.add_video_to_user_queue(
+        user_id=test_user.id,
+        video_url="https://www.youtube.com/watch?v=paidvideo11",
+        channel_name="test_user",
+        platform="donationalerts",
+        requester_name="Paid Donor",
+        requester_id="donor-1",
+        is_paid=True,
+        paid_source="donationalerts",
+        paid_amount=250.0,
+        paid_currency="RUB",
+        source_alert_id="alert-1",
+        priority_next=True,
+        db=db,
+    )
+
+    assert result["success"] is True
+    assert result["queue_item"]["position"] == 2
+    assert result["queue_item"]["paid_source"] == "donationalerts"
+
+    reordered_items = (
+        db.query(YouTubeQueue)
+        .filter(YouTubeQueue.user_id == test_user.id, YouTubeQueue.status == "pending")
+        .order_by(YouTubeQueue.position.asc())
+        .all()
+    )
+
+    assert [item.video_id for item in reordered_items] == [
+        "currentvideo",
+        "paidvideo11",
+        "normalnext1",
+        "normallater2",
+    ]
+    assert reordered_items[1].is_paid is True
+    assert reordered_items[1].paid_amount == 250.0
+
+
+@pytest.mark.asyncio
+async def test_add_video_to_queue_uses_owner_name_and_broadcasts_once(db, test_user, monkeypatch):
+    calls: list[int] = []
+
+    async def _broadcast(user_id: int):
+        calls.append(user_id)
+
+    monkeypatch.setattr(
+        "services.youtube.queue_service.broadcast_youtube_queue_update",
+        _broadcast,
+    )
+
+    service = QueueService()
+    service.youtube_service.is_valid_youtube_url = lambda _url: True
+
+    async def _video_info(_url):
+        return {
+            "video_id": "ownernamed1",
+            "title": "Owner Named",
+            "duration": "3:33",
+            "thumbnail_url": "https://img.youtube.com/vi/ownernamed1/hqdefault.jpg",
+        }
+
+    service.youtube_service.get_video_info = _video_info
+
+    result = await service.add_video_to_user_queue(
+        user_id=test_user.id,
+        video_url="https://www.youtube.com/watch?v=ownernamed1",
+        channel_name="web_interface",
+        platform="web",
+        requester_name=f"User_{test_user.id}",
+        requester_id=str(test_user.id),
+        db=db,
+    )
+
+    assert result["success"] is True
+    assert result["queue_item"]["requester_name"] == test_user.twitch_username
+    assert calls == [test_user.id]
+
+
+@pytest.mark.asyncio
+async def test_paid_priority_does_not_shift_queue_when_points_deduction_fails(db, test_user, monkeypatch):
+    async def _no_broadcast(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "services.youtube.queue_service.broadcast_youtube_queue_update",
+        _no_broadcast,
+    )
+
+    db.add_all(
+        [
+            _queue_item(
+                user_id=test_user.id,
+                video_id="currentvideo",
+                title="Current Video",
+                position=1,
+            ),
+            _queue_item(
+                user_id=test_user.id,
+                video_id="normalnext1",
+                title="Normal Next",
+                position=2,
+            ),
+        ]
+    )
+    db.commit()
+
+    service = QueueService()
+    service.youtube_service.is_valid_youtube_url = lambda _url: True
+
+    async def _video_info(_url):
+        return {
+            "video_id": "paidvideo12",
+            "title": "Paid Video",
+            "duration": 123,
+            "thumbnail_url": "https://img.youtube.com/vi/paidvideo12/hqdefault.jpg",
+        }
+
+    service.youtube_service.get_video_info = _video_info
+
+    result = await service.add_video_to_user_queue(
+        user_id=test_user.id,
+        video_url="https://www.youtube.com/watch?v=paidvideo12",
+        channel_name="test_user",
+        platform="donationalerts",
+        requester_name="Paid Donor",
+        requester_id="donor-2",
+        is_paid=True,
+        points_cost=500,
+        paid_source="donationalerts",
+        paid_amount=500.0,
+        paid_currency="RUB",
+        source_alert_id="alert-2",
+        priority_next=True,
+        db=db,
+    )
+
+    assert result["success"] is False
+    assert "Not enough points" in result["error"]
+
+    pending_items = (
+        db.query(YouTubeQueue)
+        .filter(YouTubeQueue.user_id == test_user.id, YouTubeQueue.status == "pending")
+        .order_by(YouTubeQueue.position.asc())
+        .all()
+    )
+
+    assert [item.video_id for item in pending_items] == ["currentvideo", "normalnext1"]
+    assert [item.position for item in pending_items] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_queue_limit_is_enforced_before_upstream_lookup(db, test_user, monkeypatch):
+    async def _no_broadcast(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "services.youtube.queue_service.broadcast_youtube_queue_update",
+        _no_broadcast,
+    )
+
+    db.add_all(
+        [
+            _queue_item(
+                user_id=test_user.id,
+                video_id=f"video-{index}",
+                title=f"Video {index}",
+                position=index + 1,
+            )
+            for index in range(10)
+        ]
+    )
+    db.commit()
+
+    service = QueueService()
+    service.youtube_service.is_valid_youtube_url = lambda _url: True
+
+    async def _should_not_be_called(_url):
+        raise AssertionError("Upstream lookup must not run when queue is already full")
+
+    service.youtube_service.get_video_info = _should_not_be_called
+
+    result = await service.add_video_to_user_queue(
+        user_id=test_user.id,
+        video_url="https://www.youtube.com/watch?v=queuefull99",
+        channel_name="web_interface",
+        platform="web",
+        requester_name="tester",
+        requester_id="tester",
+        db=db,
+    )
+
+    assert result["success"] is False
+    assert "Queue limit reached" in result["error"]

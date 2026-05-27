@@ -24,6 +24,7 @@ interface YouTubePlayer {
     playVideo: () => void;
     setVolume: (volume: number) => void;
     getVolume?: () => number;
+    isMuted?: () => boolean;
     mute: () => void;
     unMute: () => void;
     getCurrentTime: () => number;
@@ -137,11 +138,10 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
             return { ...state, userPaused: action.payload };
         case 'SET_VOLUME': {
             const normalizedVolume = Math.max(0, Math.min(100, Math.round(action.payload)));
-            const nextMuted = normalizedVolume === 0;
-            if (state.volume === normalizedVolume && state.isMuted === nextMuted) {
+            if (state.volume === normalizedVolume) {
                 return state;
             }
-            return { ...state, volume: normalizedVolume, isMuted: nextMuted };
+            return { ...state, volume: normalizedVolume };
         }
         case 'SET_MUTED':
             return { ...state, isMuted: action.payload };
@@ -300,6 +300,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
         const clamped = Math.max(0, Math.min(100, Math.round(parsedVolume)));
         dispatch({ type: 'SET_VOLUME', payload: clamped });
+        dispatch({ type: 'SET_MUTED', payload: clamped === 0 });
     }, []);
 
     useEffect(() => {
@@ -423,6 +424,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 const parsedVolume = Number(event.newValue);
                 if (!Number.isNaN(parsedVolume)) {
                     dispatch({ type: 'SET_VOLUME', payload: parsedVolume });
+                    dispatch({ type: 'SET_MUTED', payload: parsedVolume === 0 });
                 }
                 return;
             }
@@ -557,6 +559,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             return;
         }
         dispatch({ type: 'SET_VOLUME', payload: normalizedVolume });
+        dispatch({ type: 'SET_MUTED', payload: nextMuted });
 
         if (state.playerRef) {
             try {
@@ -693,9 +696,17 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 }
 
                 const playerVolume = state.playerRef.getVolume?.();
-                if (!state.isMuted && typeof playerVolume === 'number' && Math.abs(playerVolume - state.volume) > 1) {
+                if (typeof playerVolume === 'number' && Math.abs(playerVolume - state.volume) > 1) {
                     const clampedVolume = Math.max(0, Math.min(100, Math.round(playerVolume)));
                     dispatch({ type: 'SET_VOLUME', payload: clampedVolume });
+                    if (clampedVolume > 0) {
+                        lastNonZeroVolumeRef.current = clampedVolume;
+                    }
+                }
+
+                const playerMuted = state.playerRef.isMuted?.();
+                if (typeof playerMuted === 'boolean' && playerMuted !== state.isMuted) {
+                    dispatch({ type: 'SET_MUTED', payload: playerMuted });
                 }
             } catch {
                 // Игнорируем ошибки
@@ -808,7 +819,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
 
     useEffect(() => {
         const messageType = (lastJsonMessage as { type?: string } | null)?.type;
-        if (messageType === 'youtube_queue_update' || messageType === 'youtube_queue_updated') {
+        if (messageType === 'youtube_queue_updated') {
             logger.debug('[YouTube] Queue updated via WebSocket, reloading...');
             loadQueue(true);
         }

@@ -1,6 +1,8 @@
 """API for webhook events, widget tokens, and internal drops triggers."""
+import math
 import logging
 import random
+import re
 import secrets
 from typing import Optional
 
@@ -14,6 +16,11 @@ from repositories.user_repository import UserRepository
 from repositories.drops_reward_repository import DropsRewardRepository
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/drops', tags=['drops'])
+
+YOUTUBE_URL_RE = re.compile(
+    r"https?://(?:www\.)?(?:youtube\.com/(?:watch\?[^\s<>]*v=|shorts/|live/)|youtu\.be/)[^\s<>]+",
+    re.IGNORECASE,
+)
 
 
 class DropsWidgetTestEventRequest(BaseModel):
@@ -134,6 +141,30 @@ def _verify_donationalerts_webhook_secret(request: Request) -> None:
     if not provided_secret or not secrets.compare_digest(provided_secret, configured_secret):
         logger.warning("Rejected DonationAlerts webhook request: invalid or missing webhook secret")
         raise HTTPException(status_code=403, detail="Invalid webhook signature.")
+
+
+def _extract_first_youtube_url(message: str) -> str | None:
+    match = YOUTUBE_URL_RE.search(str(message or ""))
+    if not match:
+        return None
+    return match.group(0).rstrip(".,!?)\"]'}")
+
+
+def _safe_amount(value: object) -> float:
+    try:
+        return float(str(value).replace(",", "."))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _duration_string_to_seconds(value: str | None) -> int:
+    parts = str(value or "").split(":")
+    if not parts or any(not part.isdigit() for part in parts):
+        return 0
+    total = 0
+    for part in parts:
+        total = total * 60 + int(part)
+    return total
 
 @router.get('/triggers')
 async def get_drops_triggers(current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
@@ -363,6 +394,7 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
         channel_name = user.twitch_username or user.vk_channel_name or 'default'
         result = None
         memealerts_result = None
+        youtube_result = None
         try:
             existing_donation = db.query(DonationAlert).filter(DonationAlert.alert_id == alert_id).with_for_update().first()
             if existing_donation and existing_donation.is_processed:
@@ -379,6 +411,73 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
             result = drops_service.process_donation_drops_for_user(user_id=user_token.user_id, channel_name=channel_name, platform='donationalerts', viewer_id=donor_id, viewer_name=donor_name, donation_amount=donation_amount)
             memealerts_service = MemeAlertsService(db)
             memealerts_result = await memealerts_service.process_donation_auto_grant(user_id=user_token.user_id, channel_name=channel_name, donor_name=donor_name, donation_amount=donation_amount)
+            try:
+                from repositories.tts_settings_repository import TTSSettingsRepository
+                from services.youtube.queue_service import QueueService
+                from services.youtube.reward_settings import build_youtube_settings_response
+
+                settings_row = TTSSettingsRepository(db).get_or_create(user_id=user_token.user_id)
+                youtube_settings = build_youtube_settings_response(getattr(settings_row, "youtube_settings", None))
+                donation_value = _safe_amount(donation_amount)
+                rate_per_minute = _safe_amount(youtube_settings.get("donationalerts_video_min_amount"))
+                youtube_url = _extract_first_youtube_url(message)
+                if (
+                    youtube_settings.get("donationalerts_video_enabled")
+                    and youtube_url
+                ):
+                    queue_service = QueueService()
+                    if rate_per_minute > 0:
+                        video_info = await queue_service.youtube_service.get_video_info(youtube_url)
+                        if not video_info:
+                            youtube_result = {
+                                "success": False,
+                                "error": "Video is unavailable or has been removed. Check the URL and try again.",
+                            }
+                        else:
+                            duration_seconds = _duration_string_to_seconds(video_info.get("duration"))
+                            billed_minutes = max(1, math.ceil(duration_seconds / 60)) if duration_seconds > 0 else 1
+                            required_amount = billed_minutes * rate_per_minute
+                            if donation_value + 1e-9 < required_amount:
+                                youtube_result = {
+                                    "success": False,
+                                    "error": f"Paid video tariff requires {required_amount:g} for {billed_minutes} min.",
+                                }
+                            else:
+                                youtube_result = await queue_service.add_video_to_user_queue(
+                                    user_id=user_token.user_id,
+                                    video_url=youtube_url,
+                                    channel_name=channel_name,
+                                    platform="donationalerts",
+                                    requester_name=donor_name,
+                                    requester_id=str(donor_id),
+                                    is_paid=True,
+                                    paid_source="donationalerts",
+                                    paid_amount=donation_value,
+                                    paid_currency=str(data.get("currency") or "RUB"),
+                                    source_alert_id=alert_id,
+                                    priority_next=True,
+                                    db=db,
+                                )
+                    else:
+                        youtube_result = await queue_service.add_video_to_user_queue(
+                            user_id=user_token.user_id,
+                            video_url=youtube_url,
+                            channel_name=channel_name,
+                            platform="donationalerts",
+                            requester_name=donor_name,
+                            requester_id=str(donor_id),
+                            is_paid=True,
+                            paid_source="donationalerts",
+                            paid_amount=donation_value,
+                            paid_currency=str(data.get("currency") or "RUB"),
+                            source_alert_id=alert_id,
+                            priority_next=True,
+                            db=db,
+                        )
+                    if not youtube_result.get("success"):
+                        logger.warning("[YOUTUBE] DonationAlerts paid video skipped: %s", youtube_result.get("error"))
+            except Exception:
+                logger.exception("[YOUTUBE] DonationAlerts paid video processing failed")
             donation_record.is_processed = True
             db.commit()
         except Exception:
@@ -396,11 +495,15 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
             response_payload = {'success': True, 'message': 'Drops processed.', 'data': result}
             if memealerts_result and memealerts_result.get('handled'):
                 response_payload['memealerts'] = memealerts_result
+            if youtube_result:
+                response_payload['youtube'] = youtube_result
             return response_payload
         else:
             response_payload = {'success': True, 'processed': False, 'message': 'No matching drops result was produced.'}
             if memealerts_result and memealerts_result.get('handled'):
                 response_payload['memealerts'] = memealerts_result
+            if youtube_result:
+                response_payload['youtube'] = youtube_result
             return response_payload
     except HTTPException:
         raise

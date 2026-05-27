@@ -1,15 +1,17 @@
-// Types for react-player YouTube instance
+// YouTube iframe player methods used by the app
 export interface ReactPlayerInstance {
-    seekTo?: (seconds: number, type?: 'seconds' | 'fraction') => void;
-    getCurrentTime?: () => number;
-    getDuration?: () => number;
-    getInternalPlayer?: () => unknown;
-    play?: () => Promise<void> | void;
-    pause?: () => void;
-    currentTime?: number;
-    duration?: number;
-    volume?: number;
-    muted?: boolean;
+    seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
+    getCurrentTime: () => number;
+    getDuration: () => number;
+    playVideo: () => void;
+    pauseVideo: () => void;
+    setVolume: (volume: number) => void;
+    getVolume?: () => number;
+    isMuted?: () => boolean;
+    mute: () => void;
+    unMute: () => void;
+    loadVideoById: (videoId: string, startSeconds?: number) => void;
+    cueVideoById: (videoId: string, startSeconds?: number) => void;
 }
 
 /**
@@ -21,10 +23,12 @@ export interface YouTubePlayer {
     playVideo: () => void;
     setVolume: (volume: number) => void;
     getVolume?: () => number;
+    isMuted?: () => boolean;
     mute: () => void;
     unMute: () => void;
     getCurrentTime: () => number;
     getDuration: () => number;
+    seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
     destroy?: () => void;
     loadVideoById: (videoId: string, startSeconds?: number) => void;
     cueVideoById: (videoId: string, startSeconds?: number) => void;
@@ -39,6 +43,12 @@ export interface DisplayVideo {
     thumbnail?: string;
     thumbnail_url?: string;
     requester_name?: string;
+    added_by?: string;
     user_id?: string | number;
     played_at?: string;
+    duration?: string;
+    is_paid?: boolean;
+    paid_source?: string | null;
+    paid_amount?: number | null;
+    paid_currency?: string | null;
 }

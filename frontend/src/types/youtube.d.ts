@@ -19,6 +19,9 @@ export interface YoutubeSettings {
     requests_reward_twitch_id?: string | null;
     requests_reward_vk_enabled?: boolean;
     requests_reward_vk_id?: string | null;
+    donationalerts_video_enabled?: boolean;
+    donationalerts_video_min_amount?: number;
+    donationalerts_video_priority_next?: boolean;
 }
 
 /**
@@ -51,6 +54,15 @@ export interface YoutubeVideo {
     position: number;
     is_paid: boolean;
     points_cost: number | null;
+    paid_source?: string | null;
+    paid_amount?: number | null;
+    paid_currency?: string | null;
+    source_alert_id?: string | null;
+    skip_votes?: {
+        current: number;
+        required: number;
+        video_id?: number | string | null;
+    } | null;
     added_at: string | null;
     played_at: string | null;
     // Deprecated aliases for backward compatibility

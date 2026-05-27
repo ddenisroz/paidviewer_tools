@@ -1,5 +1,7 @@
 // src/types/chatbox.d.ts
 
+export type ChatMessageBackgroundMode = 'message' | 'column' | 'none';
+
 export interface ChatBoxSettings {
     font_family: string;
     font_size: number;
@@ -18,10 +20,11 @@ export interface ChatBoxSettings {
     show_platform_icons: boolean;
     show_roles?: boolean;
     show_badges: boolean;
-    show_avatars?: boolean;
     show_7tv_emotes: boolean;
     show_links: boolean;
     auto_load_images?: boolean;
+    separate_message_backgrounds?: boolean;
+    message_background_mode?: ChatMessageBackgroundMode;
     widget_url: string;
     version: number;
     background_color?: string;

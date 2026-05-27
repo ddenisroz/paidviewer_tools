@@ -1,16 +1,16 @@
 ﻿// src/components/chatbox/PreviewPanel.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { API_BASE_URL } from '@/constants';
 import MessageContent from '@/features/chat/components/MessageContent';
-import { getGlobalEmotes } from '@/features/chat/utils/emotes';
+import { EmoteData, getGlobalEmotes, getSevenTvFallbackEmotes, registerEmoteAliases } from '@/features/chat/utils/emotes';
 import { CHATBOX_BRAND_FONT } from '@/features/chatbox/constants/fontOptions';
-import { loadGoogleFont } from '@/features/chatbox/utils/chatboxHelpers';
+import { loadGoogleFont, resolveMessageBackgroundMode } from '@/features/chatbox/utils/chatboxHelpers';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { VkRoleBadge } from '@/shared/components/RoleBadge';
 
 import type { ChatEmote } from '@/types/chat';
+import type { ChatMessageBackgroundMode } from '@/types/chatbox';
 
 interface ChatBoxSettings {
     font_family: string;
@@ -33,10 +33,11 @@ interface ChatBoxSettings {
     show_platform_icons: boolean;
     show_roles?: boolean;
     show_badges: boolean;
-    show_avatars?: boolean;
     show_7tv_emotes: boolean;
     show_links: boolean;
     auto_load_images?: boolean;
+    separate_message_backgrounds?: boolean;
+    message_background_mode?: ChatMessageBackgroundMode;
 }
 
 interface PreviewMessage {
@@ -62,33 +63,7 @@ interface PreviewPanelProps {
     twitchChannelName?: string | null;
 }
 
-interface EmoteData {
-    id: string;
-    name: string;
-    url: string;
-    animated: boolean;
-}
-
-const PREVIEW_7TV_FALLBACKS: EmoteData[] = [
-    {
-        id: 'preview-7tv-hype',
-        name: 'HYPE',
-        url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
-        animated: false,
-    },
-    {
-        id: 'preview-7tv-obsent',
-        name: 'Obsent',
-        url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
-        animated: false,
-    },
-    {
-        id: 'preview-7tv-imnotcrying',
-        name: 'imNOTcrying',
-        url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
-        animated: false,
-    },
-];
+const PREVIEW_7TV_FALLBACKS = getSevenTvFallbackEmotes();
 
 const PREVIEW_TWITCH_BADGE_FALLBACKS: Record<string, string> = {
     'broadcaster/1': 'https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1',
@@ -128,20 +103,6 @@ const tryVkAssetFallback = (img: HTMLImageElement): boolean => {
     return false;
 };
 
-const registerInlineEmote = (map: Map<string, EmoteData>, emote: EmoteData): void => {
-    if (!emote.name || !emote.url) return;
-    const trimmed = emote.name.replace(/^:+|:+$/g, '');
-    const keys = new Set<string>([
-        emote.name,
-        emote.name.toLowerCase(),
-        trimmed,
-        trimmed.toLowerCase(),
-        `:${trimmed}:`,
-        `:${trimmed.toLowerCase()}:`,
-    ]);
-    keys.forEach((key) => map.set(key, emote));
-};
-
 const toRenderedPreviewMessage = (message: PreviewMessage): RenderedPreviewMessage => ({
     ...message,
     preview_key: `${message.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -168,6 +129,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
             : 'slide-left'
         : settings.animation_type;
     const chatWidth = Math.max(20, Math.min(100, settings.chat_width || 100));
+    const messageBackgroundMode = resolveMessageBackgroundMode(settings);
     const resolvedFontFamily = useMemo(() => {
         const safeFontFamily = settings.font_family ? sanitizeFontFamily(settings.font_family) : '';
         if (!safeFontFamily) return `${CHATBOX_BRAND_FONT}, sans-serif`;
@@ -184,7 +146,15 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
         const b = parseInt(hex.slice(5, 7), 16);
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     };
-    const panelBackground = 'linear-gradient(180deg, rgba(6,10,24,0.95) 0%, rgba(5,8,18,0.98) 100%)';
+    const panelBackground = [
+        'linear-gradient(135deg, rgba(56,189,248,0.08) 0%, rgba(56,189,248,0) 42%)',
+        'repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 14px, rgba(255,255,255,0.012) 14px 28px)',
+        'linear-gradient(180deg, rgba(6,10,24,0.95) 0%, rgba(5,8,18,0.98) 100%)',
+    ].join(', ');
+    const sharedColumnBackground =
+        messageBackgroundMode === 'column'
+            ? hexToRgba(settings.background_color || '#000000', settings.background_opacity)
+            : 'transparent';
 
     const getAnimationName = (type: string) => {
         switch (type) {
@@ -208,8 +178,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
         if (!settings.show_7tv_emotes) return new Map<string, EmoteData>();
         const base = new Map(globalEmotes);
         PREVIEW_7TV_FALLBACKS.forEach((emote) => {
-            if (!base.has(emote.name)) base.set(emote.name, emote);
-            if (!base.has(emote.name.toLowerCase())) base.set(emote.name.toLowerCase(), emote);
+            registerEmoteAliases(base, emote);
         });
         return base;
     }, [globalEmotes, settings.show_7tv_emotes]);
@@ -242,20 +211,17 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
         };
     }, [settings.font_family, settings.font_size, settings.font_weight]);
 
-    useEffect(() => {
-        if (!isHorizontal) return undefined;
-
+    useLayoutEffect(() => {
         const container = scrollContainerRef.current;
         if (!container) return undefined;
 
-        const frame = requestAnimationFrame(() => {
-            container.scrollTo({
-                left: container.scrollWidth,
-                behavior: 'smooth',
-            });
-        });
+        if (isHorizontal) {
+            container.scrollLeft = container.scrollWidth;
+            return undefined;
+        }
 
-        return () => cancelAnimationFrame(frame);
+        container.scrollTop = container.scrollHeight;
+        return undefined;
     }, [
         fontLoadVersion,
         isHorizontal,
@@ -263,7 +229,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
         settings.chat_width,
         settings.font_size,
         settings.message_spacing,
-        settings.show_avatars,
         settings.show_badges,
         settings.show_links,
         settings.show_platform_icons,
@@ -413,12 +378,15 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                 >
                     <div
                         ref={scrollContainerRef}
-                        className={`${isHorizontal ? 'overflow-x-auto overflow-y-hidden' : 'overflow-hidden'} chatbox-preview-scroll`}
+                        className={`${isHorizontal ? 'overflow-x-auto overflow-y-hidden' : 'overflow-y-auto overflow-x-hidden'} chatbox-preview-scroll`}
                         style={{
                             width: `${chatWidth}%`,
                             maxWidth: '100%',
                             height: '100%',
-                            paddingBottom: 0,
+                            paddingBottom: isHorizontal ? 0 : `${Math.max(14, settings.font_size * 1.15)}px`,
+                            paddingTop: isHorizontal ? 0 : `${Math.max(6, settings.message_spacing)}px`,
+                            boxSizing: 'border-box',
+                            scrollPaddingBlockEnd: isHorizontal ? undefined : `${Math.max(14, settings.font_size * 1.15)}px`,
                             scrollbarWidth: 'none',
                         }}
                     >
@@ -427,8 +395,26 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                 display: 'flex',
                                 flexDirection: isHorizontal ? 'row' : 'column',
                                 alignItems: isHorizontal ? 'center' : 'stretch',
+                                justifyContent: isHorizontal ? 'flex-start' : 'flex-end',
                                 gap: isHorizontal ? '8px' : `${settings.message_spacing}px`,
                                 width: isHorizontal ? 'max-content' : '100%',
+                                minHeight: isHorizontal ? 'auto' : '100%',
+                                padding:
+                                    messageBackgroundMode === 'column'
+                                        ? isHorizontal
+                                            ? '6px 10px'
+                                            : '8px'
+                                        : '0',
+                                boxSizing: 'border-box',
+                                borderRadius:
+                                    messageBackgroundMode === 'column'
+                                        ? `${settings.border_radius ?? 8}px`
+                                        : '0',
+                                backgroundColor: sharedColumnBackground,
+                                boxShadow:
+                                    messageBackgroundMode === 'column' && sharedColumnBackground !== 'transparent'
+                                        ? 'inset 0 0 0 1px rgba(255,255,255,0.06), 0 10px 24px rgba(0,0,0,0.18)'
+                                        : 'none',
                             }}
                         >
                             {simulatedMessages.map((msg) => {
@@ -439,10 +425,10 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                     animationName &&
                                     msg.preview_key === lastAnimatedMessageKey;
                                 const platformIconSize = Math.max(12, Math.min(24, settings.font_size));
-                                const messageBackground = hexToRgba(
-                                    settings.background_color || '#000000',
-                                    settings.background_opacity
-                                );
+                                const messageBackground =
+                                    messageBackgroundMode !== 'message'
+                                        ? 'transparent'
+                                        : hexToRgba(settings.background_color || '#000000', settings.background_opacity);
                                 const metaGroupStyle: React.CSSProperties = {
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -470,7 +456,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                             url: normalizeVkAssetUrl(emote.url),
                                             animated: false,
                                         };
-                                        registerInlineEmote(vkInlineEmotes, mapped);
+                                        registerEmoteAliases(vkInlineEmotes, mapped);
                                     });
                                 }
                                 const messageGlobalEmotes = settings.show_7tv_emotes
@@ -484,6 +470,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                         twitchEmotes={msg.platform === 'twitch' ? msg.emotes : []}
                                         showLinks={settings.show_links}
                                         autoLoadImages={settings.auto_load_images ?? true}
+                                        imageLoading="eager"
                                     />
                                 );
                                 const baseMessageStyle: React.CSSProperties = {
@@ -499,6 +486,10 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                     maxWidth: isHorizontal ? '600px' : 'auto',
                                     padding: isHorizontal ? '6px 10px' : '4px 8px',
                                     backgroundColor: messageBackground,
+                                    boxShadow:
+                                        messageBackgroundMode === 'message' && messageBackground !== 'transparent'
+                                            ? 'inset 0 0 0 1px rgba(255,255,255,0.06), 0 8px 20px rgba(0,0,0,0.22)'
+                                            : 'none',
                                     lineHeight: 1.3,
                                 };
                                 const strokeStyle =
@@ -573,7 +564,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                                         src={badgeUrl}
                                                                         alt={badgeId}
                                                                         title={badgeId}
-                                                                        loading="lazy"
+                                                                        loading="eager"
                                                                         style={{
                                                                             width: `${badgeSize}px`,
                                                                             height: `${badgeSize}px`,
@@ -598,7 +589,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                                     key={`${msg.id}-${idx}`}
                                                                     src={normalizeVkAssetUrl(badge)}
                                                                     alt="badge"
-                                                                    loading="lazy"
+                                                                    loading="eager"
                                                                     style={{
                                                                         width: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
                                                                         height: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
@@ -632,24 +623,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                 fontWeight: 600,
                                             }}
                                         >
-                                            {settings.show_avatars && msg.avatar_url && (
-                                                <img
-                                                    src={msg.avatar_url}
-                                                    alt={msg.author}
-                                                    loading="lazy"
-                                                    style={{
-                                                        width: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
-                                                        height: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
-                                                        borderRadius: '999px',
-                                                        display: 'inline-block',
-                                                        verticalAlign: 'text-bottom',
-                                                        marginRight: '6px',
-                                                    }}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).style.display = 'none';
-                                                    }}
-                                                />
-                                            )}
                                             {msg.author}:
                                         </span>{' '}
                                         {settings.show_roles && msg.role && (

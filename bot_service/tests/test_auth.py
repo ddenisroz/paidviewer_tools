@@ -200,6 +200,28 @@ class TestJWT:
         assert payload["user_id"] == test_user.id
         assert payload["is_admin"] == is_admin
 
+    def test_tts_obs_tokens_are_scoped(self, test_user):
+        """Dedicated OBS dock/source tokens must not be interchangeable."""
+        from auth.auth import create_jwt_token, verify_jwt_token
+
+        dock_token = create_jwt_token(test_user.id, token_type="tts_dock")
+        source_token = create_jwt_token(test_user.id, token_type="tts_source")
+
+        dock_payload = verify_jwt_token(dock_token, expected_type="tts_dock")
+        source_payload = verify_jwt_token(source_token, expected_type="tts_source")
+
+        assert dock_payload["user_id"] == test_user.id
+        assert dock_payload["type"] == "tts_dock"
+        assert dock_payload["scope"] == "tts_dock"
+        assert isinstance(dock_payload["iat"], int)
+        assert dock_payload["jti"]
+        assert source_payload["type"] == "tts_source"
+        assert source_payload["scope"] == "tts_source"
+        assert source_payload["jti"]
+
+        with pytest.raises(Exception):
+            verify_jwt_token(dock_token, expected_type="tts_source")
+
     def test_decode_invalid_jwt_token(self):
         """Тест декодирования неверного JWT токена"""
         with pytest.raises(Exception):

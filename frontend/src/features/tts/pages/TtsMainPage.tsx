@@ -36,7 +36,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
-import { getApiBaseUrl, getFrontendBaseUrl } from '@/shared/utils/urlUtils';
+import { getFrontendBaseUrl } from '@/shared/utils/urlUtils';
 
 import type { ApiResponse } from '@/types';
 import type { TtsSettings, TtsStatus } from '@/types/tts';
@@ -74,6 +74,16 @@ interface ObsStatus {
     dock_connected?: boolean;
 }
 
+interface TtsObsLinks {
+    dock_token?: string | null;
+    source_token?: string | null;
+    dock_url?: string | null;
+    source_url?: string | null;
+    obs_token?: string | null;
+    dock_connected?: boolean;
+    source_connected?: boolean;
+}
+
 const unwrapPayload = <T,>(payload: ApiResponse<T> | T | undefined | null): T | undefined => {
     if (!payload) return undefined;
     if (typeof payload === 'object' && payload !== null && 'data' in payload) {
@@ -85,7 +95,13 @@ const unwrapPayload = <T,>(payload: ApiResponse<T> | T | undefined | null): T | 
 const buildTtsObsDockUrl = (token?: string | null): string => {
     const normalizedToken = (token || '').trim();
     if (!normalizedToken) return '';
-    return `${getFrontendBaseUrl()}/tts/obs-dock?obs_token=${encodeURIComponent(normalizedToken)}`;
+    return `${getFrontendBaseUrl()}/tts/obs-dock?dock_token=${encodeURIComponent(normalizedToken)}`;
+};
+
+const buildTtsObsSourceUrl = (token?: string | null): string => {
+    const normalizedToken = (token || '').trim();
+    if (!normalizedToken) return '';
+    return `${getFrontendBaseUrl()}/tts-obs/${encodeURIComponent(normalizedToken)}`;
 };
 
 const ENGINE_COPY: Record<EngineType, { label: string; icon: React.ElementType }> = {
@@ -142,16 +158,14 @@ const TtsMainPage: React.FC = () => {
             return payload.data?.voices || payload.voices || [];
         },
     });
-    const { data: obsUrlResponse, refetch: refetchObsUrl } = useQuery<{ obs_token?: string | null }>({
+    const { data: obsUrlResponse, refetch: refetchObsUrl } = useQuery<TtsObsLinks>({
         queryKey: ['tts', 'obs-url'],
         enabled: Boolean(userId),
         staleTime: 5 * 60 * 1000,
         queryFn: async () => {
-            const response = await ttsService.getObsUrl();
+            const response = await ttsService.getObsLinks();
             return (
-                unwrapPayload<{ obs_token?: string | null }>(
-                    response.data as ApiResponse<{ obs_token?: string | null }> | { obs_token?: string | null }
-                ) || {}
+                unwrapPayload<TtsObsLinks>(response.data as ApiResponse<TtsObsLinks> | TtsObsLinks) || {}
             );
         },
     });
@@ -187,6 +201,7 @@ const TtsMainPage: React.FC = () => {
     const [blockedPlatform, setBlockedPlatform] = useState<BlockedPlatform>('twitch');
     const [blockedUsersOpen, setBlockedUsersOpen] = useState(false);
     const forbiddenWordFormRef = useRef<HTMLDivElement | null>(null);
+    const savedMaxMessageLengthRef = useRef(150);
 
     const connectedPlatforms = useMemo(
         () =>
@@ -198,14 +213,16 @@ const TtsMainPage: React.FC = () => {
 
     useEffect(() => {
         if (!settings) return;
+        const maxMessageLength = Math.max(50, Math.min(250, Number(settings.maxMessageLength ?? settings.max_message_length ?? 150)));
         setSettingsState({
             filterReplies: Boolean(settings.filterReplies ?? settings.filter_replies ?? false),
             filterMentions: Boolean(settings.filterMentions ?? settings.filter_mentions ?? false),
             skipCommands: Boolean(settings.skipCommands ?? settings.skip_commands ?? true),
             disableVoiceSelection: Boolean(settings.disableVoiceSelection ?? settings.disable_voice_selection ?? false),
             speakSenderName: Boolean(settings.speakSenderName ?? settings.speak_sender_name ?? false),
-            maxMessageLength: Math.max(50, Math.min(250, Number(settings.maxMessageLength ?? settings.max_message_length ?? 150))),
+            maxMessageLength,
         });
+        savedMaxMessageLengthRef.current = maxMessageLength;
         setListeningMode(
             (settings.listeningMode as ListeningMode) || (settings.listening_mode as ListeningMode) || 'website'
         );
@@ -243,8 +260,8 @@ const TtsMainPage: React.FC = () => {
     const isEngineBusy = setEngineMutation.isPending;
     const isEnabled = Boolean(status?.enabled);
     const hasLocalSetup = Boolean(status?.has_local_setup_f5 || status?.has_local_setup);
-    const obsPlayerUrl = buildTtsObsDockUrl(obsUrlResponse?.obs_token);
-    const obsPlayerConnected = Boolean(obsStatus.dock_connected || obsStatus.source_connected);
+    const obsDockUrl = obsUrlResponse?.dock_url || buildTtsObsDockUrl(obsUrlResponse?.dock_token || obsUrlResponse?.obs_token);
+    const obsSourceUrl = obsUrlResponse?.source_url || buildTtsObsSourceUrl(obsUrlResponse?.source_token || obsUrlResponse?.obs_token);
 
     const gcloudVoiceOptions = useMemo(
         () =>
@@ -262,10 +279,23 @@ const TtsMainPage: React.FC = () => {
         saveSettingsMutation.mutate({ [key]: value } as Partial<TtsSettings>);
     };
 
-    const handleMaxLengthChange = (value: number): void => {
+    const handleMaxLengthPreviewChange = (value: number): void => {
         const nextValue = Math.max(50, Math.min(250, Number.isFinite(value) ? Math.round(value) : 150));
         setSettingsState((prev) => ({ ...prev, maxMessageLength: nextValue }));
-        saveSettingsMutation.mutate({ maxMessageLength: nextValue });
+    };
+
+    const commitMaxLengthChange = (value: number): void => {
+        const nextValue = Math.max(50, Math.min(250, Number.isFinite(value) ? Math.round(value) : 150));
+        if (nextValue === savedMaxMessageLengthRef.current) return;
+
+        saveSettingsMutation.mutate(
+            { maxMessageLength: nextValue },
+            {
+                onSuccess: () => {
+                    savedMaxMessageLengthRef.current = nextValue;
+                },
+            }
+        );
     };
 
     const handlePlatformToggle = (platform: Platform, enabled: boolean): void => {
@@ -337,7 +367,7 @@ const TtsMainPage: React.FC = () => {
 
     const handleGenerateObsUrl = async (): Promise<void> => {
         try {
-            await ttsService.generateObsUrl();
+            await ttsService.getObsLinks();
             await refetchObsUrl();
             toast.success('OBS source создан');
         } catch {
@@ -436,28 +466,40 @@ const TtsMainPage: React.FC = () => {
                                 {listeningMode === 'obs' ? (
                                     <div className="w-full space-y-2.5 rounded-lg border border-border/70 bg-background/35 p-2.5">
                                         <div className="flex items-center gap-2">
-                                            <Input value={obsPlayerUrl || 'OBS player URL не создан'} readOnly className="h-9 min-w-0 font-mono text-xs" />
-                                            {obsPlayerUrl ? (
-                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsPlayerUrl)}>
+                                            <Input value={obsDockUrl || 'OBS dock URL not created'} readOnly className="h-9 min-w-0 font-mono text-xs" />
+                                            {obsDockUrl ? (
+                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsDockUrl)}>
                                                     <Copy className="h-4 w-4" />
                                                 </Button>
                                             ) : (
                                                 <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => void handleGenerateObsUrl()}>
-                                                    Создать
+                                                    Create
                                                 </Button>
                                             )}
                                         </div>
+                                        <div className="flex items-center gap-2">
+                                            <Input value={obsSourceUrl || 'OBS audio source URL not created'} readOnly className="h-9 min-w-0 font-mono text-xs" />
+                                            {obsSourceUrl ? (
+                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsSourceUrl)}>
+                                                    <Copy className="h-4 w-4" />
+                                                </Button>
+                                            ) : null}
+                                        </div>
                                         <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
                                             <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-2.5 py-1">
-                                                <span className={`h-2.5 w-2.5 rounded-full ${obsPlayerConnected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
-                                                OBS плеер
+                                                <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.dock_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
+                                                OBS dock
+                                            </span>
+                                            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-2.5 py-1">
+                                                <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.source_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
+                                                OBS audio
                                             </span>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="flex h-full w-full items-center justify-center">
-                                        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-                                            <div className="justify-self-end text-right font-brand text-base font-bold leading-tight text-emerald-100">
+                                        <div className="flex w-full flex-col items-center justify-center gap-3 text-center">
+                                            <div className="order-2 font-brand text-base font-bold leading-tight text-emerald-100">
                                                 Начать слушать чат
                                             </div>
                                             <a
@@ -466,11 +508,10 @@ const TtsMainPage: React.FC = () => {
                                                 rel="noreferrer"
                                                 aria-label="Открыть TTS Player"
                                                 title="Открыть TTS Player"
-                                                className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/70 bg-emerald-500/20 text-emerald-100 shadow-lg shadow-emerald-950/30 transition-colors hover:bg-emerald-500/30"
+                                                className="order-1 inline-flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/70 bg-emerald-500/20 text-emerald-100 shadow-lg shadow-emerald-950/30 transition-colors hover:bg-emerald-500/30"
                                             >
                                                 <CirclePlay className="h-7 w-7" />
                                             </a>
-                                            <span aria-hidden="true" />
                                         </div>
                                     </div>
                                 )}
@@ -571,7 +612,8 @@ const TtsMainPage: React.FC = () => {
                                     min={50}
                                     max={250}
                                     step={10}
-                                    onValueChange={(values) => handleMaxLengthChange(values[0])}
+                                    onValueChange={(values) => handleMaxLengthPreviewChange(values[0])}
+                                    onValueCommit={(values) => commitMaxLengthChange(values[0])}
                                     disabled={saveSettingsMutation.isPending}
                                 />
                             </div>
