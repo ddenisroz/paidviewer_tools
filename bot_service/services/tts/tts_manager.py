@@ -36,6 +36,7 @@ from services.tts.google_cloud_tts import (
     is_gemini_or_chirp_voice,
     normalize_gcloud_mood,
 )
+from services.tts.language_routing import enrich_tts_settings_with_language_routing
 from services.tts.provider_audio import (
     build_provider_success_result as build_provider_success_result_impl,
     materialize_provider_audio as materialize_provider_audio_impl,
@@ -520,6 +521,25 @@ class TTSManager:
             "worker_key": final_job.get("worker_key"),
             "job_id": final_job.get("id"),
             "worker_path_used": True,
+            "meta": result_payload.get("meta") if isinstance(result_payload.get("meta"), dict) else {},
+            "speed_preset": result_payload.get("speed_preset")
+            or (
+                result_payload.get("meta", {}).get("speed_preset")
+                if isinstance(result_payload.get("meta"), dict)
+                else None
+            ),
+            "cfg_strength": result_payload.get("cfg_strength")
+            or (
+                result_payload.get("meta", {}).get("cfg_strength")
+                if isinstance(result_payload.get("meta"), dict)
+                else None
+            ),
+            "endpoint_used": result_payload.get("endpoint_used")
+            or (
+                result_payload.get("meta", {}).get("endpoint_used")
+                if isinstance(result_payload.get("meta"), dict)
+                else None
+            ),
         }
 
     async def synthesize_tts(
@@ -540,12 +560,21 @@ class TTSManager:
     ) -> Dict:
         """Synthesize speech with provider-first routing and explicit fallback metadata."""
 
-        settings_dict = tts_settings or {}
+        settings_dict = enrich_tts_settings_with_language_routing(tts_settings, text)
         resolved_engine = (engine or ("f5tts" if use_ai_tts else "gtts")).strip().lower()
         logger.info("[MIC] Engine resolved: %s", resolved_engine)
         requested_provider = resolve_requested_provider(
             resolved_engine=resolved_engine,
             settings_dict=settings_dict,
+        )
+        language_routing = settings_dict.get("language_routing") if isinstance(settings_dict.get("language_routing"), dict) else {}
+        logger.info(
+            "[TRACE] TTS language routing route_target=%s detected_language=%s requires_bilingual=%s reason=%s latin_preview=%s",
+            language_routing.get("route_target", "-"),
+            language_routing.get("detected_language", "-"),
+            bool(language_routing.get("requires_bilingual_checkpoint")),
+            language_routing.get("decision_reason", "-"),
+            ",".join(language_routing.get("plain_latin_words_preview", [])[:5]) if isinstance(language_routing.get("plain_latin_words_preview"), list) else "-",
         )
         fallback_reason: Optional[str] = None
 

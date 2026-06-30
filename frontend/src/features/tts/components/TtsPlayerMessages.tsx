@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { formatAppDateTime } from '@/shared/utils/dateTime';
 
 type TtsMessageStatus = 'not_voiced' | 'queued' | 'playing' | 'played' | 'failed';
 
@@ -31,7 +32,7 @@ const formatMessage = (text: string, maxLength: number): string =>
     text.length <= maxLength ? text : `${text.slice(0, maxLength)}...`;
 
 const formatQueuedAt = (date: Date): string =>
-    date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    formatAppDateTime(date, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
 export const TtsPlayerMessages: React.FC<{ compact: boolean; messages: TtsPlayerMessage[] }> = ({
     compact,
@@ -40,20 +41,20 @@ export const TtsPlayerMessages: React.FC<{ compact: boolean; messages: TtsPlayer
     <Card
         className={
             compact
-                ? 'card-glass flex min-h-0 flex-col border-border/70'
+                ? 'flex min-h-0 flex-col border-white/6 bg-[#090612]/96 shadow-[0_12px_40px_rgba(0,0,0,0.22)]'
                 : 'card-glass flex min-h-0 max-h-[min(430px,calc(100vh-160px))] flex-1 flex-col border-border/70'
         }
     >
-        <CardHeader className="border-b border-white/5 px-4 py-2.5">
-            <CardTitle className="text-base">Голоса озвучки</CardTitle>
+        <CardHeader className={compact ? 'border-b border-white/6 px-3 py-2.5' : 'border-b border-white/5 px-4 py-2.5'}>
+            <CardTitle className={compact ? 'text-sm font-bold text-slate-50' : 'text-base'}>Лента озвучки</CardTitle>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 p-2">
             {messages.length === 0 ? (
-                <div className="rounded-md border border-dashed border-border/70 px-3 py-5 text-center text-sm text-muted-foreground">
+                <div className={compact ? 'rounded-lg border border-dashed border-white/10 bg-white/[0.03] px-3 py-5 text-center text-sm text-slate-400' : 'rounded-md border border-dashed border-border/70 px-3 py-5 text-center text-sm text-muted-foreground'}>
                     Жду сообщения
                 </div>
             ) : (
-                <div className="h-full min-h-0 overflow-y-auto rounded-md border border-white/10 bg-background/45 px-2 py-1 custom-scrollbar">
+                <div className={compact ? 'h-full min-h-0 overflow-y-auto rounded-lg border border-white/10 bg-black/20 px-2 py-1 custom-scrollbar' : 'h-full min-h-0 overflow-y-auto rounded-md border border-white/10 bg-background/45 px-2 py-1 custom-scrollbar'}>
                     {messages.map((message) => (
                         <TtsPlayerMessageRow
                             key={message.id}

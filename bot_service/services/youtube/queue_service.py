@@ -120,6 +120,7 @@ class QueueService:
         paid_currency: str | None = None,
         source_alert_id: str | None = None,
         priority_next: bool = False,
+        priority_by_amount: bool = False,
         db: Session | None = None,
     ) -> Dict[str, Any]:
         """Active user-only queue path for dashboard and bot commands."""
@@ -138,10 +139,11 @@ class QueueService:
             paid_currency=paid_currency,
             source_alert_id=source_alert_id,
             priority_next=priority_next,
+            priority_by_amount=priority_by_amount,
             db=db,
         )
 
-    async def add_video_to_queue(self, user_id: int=None, session_id: str=None, video_url: str=None, channel_name: str=None, platform: str=None, requester_name: str=None, requester_id: str=None, is_paid: bool=False, points_cost: int=None, paid_source: str | None=None, paid_amount: float | None=None, paid_currency: str | None=None, source_alert_id: str | None=None, priority_next: bool=False, db: Session=None) -> Dict[str, Any]:
+    async def add_video_to_queue(self, user_id: int=None, session_id: str=None, video_url: str=None, channel_name: str=None, platform: str=None, requester_name: str=None, requester_id: str=None, is_paid: bool=False, points_cost: int=None, paid_source: str | None=None, paid_amount: float | None=None, paid_currency: str | None=None, source_alert_id: str | None=None, priority_next: bool=False, priority_by_amount: bool=False, db: Session=None) -> Dict[str, Any]:
         """Add a video to the queue."""
         user_id, session_id, db = self._normalize_scope_args(user_id=user_id, session_id=session_id, db=db)
         if db is None:
@@ -196,7 +198,21 @@ class QueueService:
             pending_items = queue_repo.get_pending_queue(user_id=user_id, session_id=session_id)
             max_position = len(pending_items)
             insert_position = max_position + 1
-            if priority_next:
+            if priority_by_amount and is_paid and paid_amount is not None:
+                donation_amount = float(paid_amount or 0)
+                for item in pending_items:
+                    if max_position > 0 and item.position <= 1:
+                        continue
+                    item_amount = float(getattr(item, "paid_amount", 0) or 0)
+                    if getattr(item, "is_paid", False) and item_amount + 1e-9 < donation_amount:
+                        insert_position = item.position
+                        break
+                if insert_position <= max_position:
+                    for item in pending_items:
+                        if item.position >= insert_position:
+                            item.position += 1
+                    db.flush()
+            elif priority_next:
                 insert_position = 2 if max_position > 0 else 1
                 for item in pending_items:
                     if item.position >= insert_position:

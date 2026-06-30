@@ -2,7 +2,7 @@ import React from 'react';
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Ban, BarChart2, GripVertical, SkipForward, Trash2 } from 'lucide-react';
+import { Ban, GripVertical, SkipForward, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/shared/components/ui/button';
@@ -17,9 +17,25 @@ interface QueueItemProps {
     onPlay?: () => void;
     onBan?: () => void;
     onSkip?: () => void;
+    isCurrent?: boolean;
     isPlaying?: boolean;
     isDraggable?: boolean;
 }
+
+const PlayingEqualizer: React.FC = () => (
+    <span className="inline-flex h-4 w-4 shrink-0 items-end justify-center gap-[2px]" title="Сейчас играет">
+        {[0, 1, 2].map((index) => (
+            <span
+                key={index}
+                className="block w-[3px] origin-bottom rounded-full bg-primary"
+                style={{
+                    height: `${7 + index * 3}px`,
+                    animation: `queueEq 720ms ease-in-out ${index * 110}ms infinite alternate`,
+                }}
+            />
+        ))}
+    </span>
+);
 
 const QueueItem: React.FC<QueueItemProps> = ({
     video,
@@ -29,6 +45,7 @@ const QueueItem: React.FC<QueueItemProps> = ({
     onPlay,
     onBan,
     onSkip,
+    isCurrent = false,
     isPlaying = false,
     isDraggable = true,
 }) => {
@@ -46,12 +63,11 @@ const QueueItem: React.FC<QueueItemProps> = ({
     } as React.CSSProperties;
 
     const duration = video.duration || '--:--';
-
-    const isRowClickable = Boolean(onPlay && !isPlaying);
+    const isRowClickable = Boolean(onPlay && !isCurrent);
     const gridClasses = compact
         ? 'grid grid-cols-[32px_minmax(0,1fr)_minmax(120px,0.8fr)_88px]'
         : 'grid grid-cols-[32px_minmax(0,1fr)_160px_96px_96px]';
-    const requesterName = video.requester_name || video.added_by || 'Unknown';
+    const requesterName = video.requester_name || video.added_by || 'Неизвестно';
     const youtubeUrl = video.url || `https://www.youtube.com/watch?v=${video.video_id}`;
 
     const handleRowClick = (): void => {
@@ -61,9 +77,7 @@ const QueueItem: React.FC<QueueItemProps> = ({
     };
 
     const handleRowKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-        if (!isRowClickable) {
-            return;
-        }
+        if (!isRowClickable) return;
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             onPlay?.();
@@ -75,32 +89,44 @@ const QueueItem: React.FC<QueueItemProps> = ({
             ref={setNodeRef}
             style={style}
             className={cn(
-                'group items-center gap-3 px-3 py-2 hover:bg-accent/50 transition-colors border-b border-border/30 last:border-0',
+                'group items-center gap-3 border-b border-border/30 px-3 py-2 transition-colors hover:bg-accent/50 last:border-0',
                 gridClasses,
                 isRowClickable && 'cursor-pointer',
-                isPlaying && 'bg-primary/10 border-l-2 border-l-primary'
+                isCurrent && 'border-l-2 border-l-primary bg-primary/10'
             )}
             onClick={handleRowClick}
             onKeyDown={handleRowKeyDown}
             role={isRowClickable ? 'button' : undefined}
             tabIndex={isRowClickable ? 0 : undefined}
         >
-            {/* Index / Drag Handle */}
+            <style>
+                {`
+                    @keyframes queueEq {
+                        from { transform: scaleY(0.45); opacity: 0.62; }
+                        to { transform: scaleY(1); opacity: 1; }
+                    }
+                `}
+            </style>
+
             <div className="flex items-center justify-center text-muted-foreground">
                 {!compact && isDraggable ? (
                     <div
                         {...attributes}
                         {...listeners}
-                        className="cursor-move opacity-0 group-hover:opacity-100 p-1 hover:text-white transition-opacity"
+                        className="cursor-move p-1 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
                     >
-                        <GripVertical className="w-4 h-4" />
+                        <GripVertical className="h-4 w-4" />
                     </div>
                 ) : null}
 
-                <span
-                    className={cn('text-xs font-medium tabular-nums', isDraggable && !compact && 'group-hover:hidden')}
-                >
-                    {isPlaying ? <BarChart2 className="w-4 h-4 text-primary animate-pulse" /> : index + 1}
+                <span className={cn('text-xs font-medium tabular-nums', isDraggable && !compact && 'group-hover:hidden')}>
+                    {isPlaying ? (
+                        <PlayingEqualizer />
+                    ) : isCurrent ? (
+                        null
+                    ) : (
+                        index + 1
+                    )}
                 </span>
             </div>
 
@@ -108,10 +134,13 @@ const QueueItem: React.FC<QueueItemProps> = ({
                 <>
                     <div className="min-w-0 flex items-center">
                         <span
-                            className={cn(
-                                'text-sm font-medium truncate',
-                                isPlaying ? 'text-primary' : 'text-foreground'
-                            )}
+                            className={cn('text-sm font-medium leading-snug', isCurrent ? 'text-primary' : 'text-foreground')}
+                            style={{
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                            }}
                         >
                             {video.title}
                         </span>
@@ -120,7 +149,6 @@ const QueueItem: React.FC<QueueItemProps> = ({
                 </>
             ) : (
                 <>
-                    {/* Thumbnail & Title */}
                     <a
                         href={youtubeUrl}
                         target="_blank"
@@ -139,97 +167,90 @@ const QueueItem: React.FC<QueueItemProps> = ({
                         <div className="flex min-w-0 flex-col">
                             <span
                                 className={cn(
-                                    'truncate pr-4 text-sm font-medium hover:text-blue-300',
-                                    isPlaying ? 'text-primary' : 'text-foreground'
+                                    'pr-4 text-sm font-medium hover:text-blue-300',
+                                    isCurrent ? 'text-primary' : 'text-foreground'
                                 )}
+                                style={{
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                }}
                             >
                                 {video.title}
                             </span>
-                            <span className="truncate text-xs text-muted-foreground">
-                                {video.channel_name || 'YouTube'}
-                            </span>
+                            <span className="truncate text-xs text-muted-foreground">{video.channel_name || 'YouTube'}</span>
                             {(video.is_paid || video.paid_source) && (
                                 <span className="mt-0.5 w-fit rounded bg-amber-400/14 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-200">
-                                    Paid video
+                                    Платные заказы
                                 </span>
                             )}
                         </div>
                     </a>
 
-                    <div className="min-w-0 truncate text-center text-xs text-muted-foreground justify-self-center">
+                    <div className="min-w-0 justify-self-center truncate text-center text-xs text-muted-foreground">
                         {requesterName}
                     </div>
 
-                    {/* Duration */}
-                    <div className="flex w-full justify-center text-xs font-mono text-muted-foreground">
-                        {duration}
-                    </div>
+                    <div className="flex w-full justify-center text-xs font-mono text-muted-foreground">{duration}</div>
                 </>
             )}
 
-            {/* Actions */}
             <div className="flex w-full items-center justify-center gap-1.5 justify-self-center">
-                {/* Skip button - for currently playing */}
-                {!compact && isPlaying && onSkip && (
+                {!compact && isCurrent && onSkip && (
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-white hover:bg-white/10"
-                                onClick={(e) => {
-                                    e.stopPropagation();
+                                className="h-7 w-7 text-muted-foreground hover:bg-white/10 hover:text-white"
+                                onClick={(event) => {
+                                    event.stopPropagation();
                                     onSkip();
                                 }}
                             >
-                                <SkipForward className="w-3.5 h-3.5" />
+                                <SkipForward className="h-3.5 w-3.5" />
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent>
-                            {'\u041f\u0440\u043e\u043f\u0443\u0441\u0442\u0438\u0442\u044c'}
-                        </TooltipContent>
+                        <TooltipContent>Пропустить</TooltipContent>
                     </Tooltip>
                 )}
 
-                {/* Ban button */}
                 {onBan && (
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10"
-                                onClick={(e) => {
-                                    e.stopPropagation();
+                                className="h-7 w-7 text-muted-foreground hover:bg-orange-500/10 hover:text-orange-500"
+                                onClick={(event) => {
+                                    event.stopPropagation();
                                     onBan();
                                 }}
                             >
-                                <Ban className="w-3.5 h-3.5" />
+                                <Ban className="h-3.5 w-3.5" />
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent>
-                            {'\u0417\u0430\u0431\u0430\u043d\u0438\u0442\u044c \u0432\u0438\u0434\u0435\u043e'}
-                        </TooltipContent>
+                        <TooltipContent>Забанить видео</TooltipContent>
                     </Tooltip>
                 )}
 
-                {/* Remove button */}
                 {onRemove && (
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                onClick={(e) => {
-                                    e.stopPropagation();
+                                className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                onClick={(event) => {
+                                    event.stopPropagation();
                                     onRemove();
                                 }}
                             >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent>{'\u0423\u0434\u0430\u043b\u0438\u0442\u044c'}</TooltipContent>
+                        <TooltipContent>Удалить</TooltipContent>
                     </Tooltip>
                 )}
             </div>

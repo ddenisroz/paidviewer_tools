@@ -14,6 +14,7 @@
     "f5": {
       "enabled": true,
       "endpoint_url": "http://127.0.0.1:8011",
+      "mixed_language_endpoint_url": "",
       "api_key": ""
     }
   }

@@ -65,20 +65,22 @@ interface ChatMessageItemProps {
     emotes: Emotes;
     channelName: string | null;
     onNicknameClick: (e: React.MouseEvent, username: string, platform: 'twitch' | 'vk' | 'youtube') => void;
-    truncateWords: (text: string | undefined, maxWords: number) => string;
+    onMediaLoad: () => void;
 }
 
 const ChatMessageItem = memo<ChatMessageItemProps>(
-    ({ msg, index, settings, lastAddedMessageId, emotes, channelName, onNicknameClick, truncateWords }) => {
+    ({ msg, index, settings, lastAddedMessageId, emotes, channelName, onNicknameClick, onMediaLoad }) => {
         const messageId = msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`;
         const isNewMessage = messageId === lastAddedMessageId;
+        const isHorizontal = settings.chat_direction === 'horizontal';
         const metaGroupStyle: React.CSSProperties = {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '4px',
             lineHeight: 1,
-            verticalAlign: 'text-bottom',
-            marginRight: '6px',
+            verticalAlign: 'top',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
         };
         const showMeta = Boolean(
             settings?.show_platform_icons ||
@@ -106,24 +108,30 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
             const baseStyle: React.CSSProperties = {
                 fontFamily: resolvedFontFamily,
                 borderRadius: `${settings?.border_radius ?? 8}px`,
-                whiteSpace: settings.chat_direction === 'horizontal' ? 'nowrap' : 'normal',
-                wordBreak: settings.chat_direction === 'horizontal' ? 'normal' : 'break-word',
+                whiteSpace: 'normal',
+                wordBreak: 'break-word',
                 overflowWrap: 'anywhere',
-                overflow: settings.chat_direction === 'horizontal' ? 'hidden' : 'visible',
-                textOverflow: settings.chat_direction === 'horizontal' ? 'ellipsis' : 'clip',
+                overflow: 'visible',
+                textOverflow: 'clip',
                 flexShrink: 0,
-                minWidth: settings.chat_direction === 'horizontal' ? 'fit-content' : 'auto',
-                maxWidth: settings.chat_direction === 'horizontal' ? '600px' : 'auto',
+                minWidth: 0,
+                maxWidth: settings.chat_direction === 'horizontal' ? 'min(560px, 82vw)' : '100%',
                 padding: settings.chat_direction === 'horizontal' ? '6px 10px' : '4px 8px',
                 backgroundColor: messageBackground,
                 boxShadow:
                     messageBackgroundMode === 'message' && messageBackground !== 'transparent'
                         ? 'inset 0 0 0 1px rgba(255,255,255,0.06), 0 8px 20px rgba(0,0,0,0.18)'
                         : 'none',
+                textShadow:
+                    messageBackgroundMode === 'none'
+                        ? '0 2px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.95)'
+                        : undefined,
                 lineHeight: 1.25,
-                display: settings.chat_direction === 'horizontal' ? 'block' : 'flex',
-                alignItems: settings.chat_direction === 'horizontal' ? 'initial' : 'center',
-                width: settings.chat_direction === 'horizontal' ? 'auto' : '100%',
+                display: settings.chat_direction === 'horizontal' ? 'inline-grid' : 'grid',
+                gridTemplateColumns: 'max-content minmax(0, 1fr)',
+                alignItems: 'start',
+                columnGap: '6px',
+                width: settings.chat_direction === 'horizontal' ? 'max-content' : '100%',
                 minHeight: settings.chat_direction === 'horizontal' ? undefined : `${minMessageHeight}px`,
                 marginTop:
                     index > 0 && settings.chat_direction !== 'horizontal' ? `${settings?.message_spacing ?? 4}px` : '0',
@@ -165,8 +173,26 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
 
         return (
             <div key={messageId} style={messageStyle}>
-                {showMeta && (
-                    <span style={metaGroupStyle}>
+                <span
+                    style={{
+                        ...(settings.text_stroke_width && settings.text_stroke_width > 0
+                            ? {
+                                  WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
+                                  paintOrder: 'stroke fill',
+                              }
+                            : {}),
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        minWidth: 0,
+                        maxWidth: isHorizontal ? '220px' : 'min(44vw, 260px)',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        verticalAlign: 'top',
+                    }}
+                >
+                    {showMeta && (
+                        <span style={metaGroupStyle}>
                         {settings?.show_platform_icons &&
                             (msg.platform === 'twitch' ? (
                                 <TwitchIcon
@@ -262,19 +288,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
                             />
                         )}
                     </span>
-                )}
-
-                <span
-                    style={{
-                        ...(settings.text_stroke_width && settings.text_stroke_width > 0
-                            ? {
-                                  WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
-                                  paintOrder: 'stroke fill',
-                              }
-                            : {}),
-                        verticalAlign: 'baseline',
-                    }}
-                >
+                    )}
                     <span
                         onClick={(e) => onNicknameClick(e, msg.author_name || msg.author || 'Unknown', msg.platform)}
                         style={{
@@ -282,26 +296,37 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
                             fontWeight: '600',
                             cursor: 'pointer',
                             userSelect: 'none',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                         }}
                         title="Кликните для открытия меню"
                     >
                         {msg.author_name || msg.author}
                     </span>
-                    {': '}
-                    <span style={{ color: settings.text_color }}>
+                    <span style={{ color: settings.text_color }}>:</span>
+                </span>
+
+                <span
+                    style={{
+                        color: settings.text_color,
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                        whiteSpace: 'normal',
+                        alignSelf: 'start',
+                    }}
+                >
                         <MessageContent
-                            message={
-                                settings.chat_direction === 'horizontal'
-                                    ? truncateWords(msg.message || msg.content, 6)
-                                    : msg.message || msg.content || ''
-                            }
+                            message={msg.message || msg.content || ''}
                             channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
                             globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
                             twitchEmotes={msg.emotes}
                             showLinks={settings?.show_links !== false}
                             autoLoadImages={settings?.auto_load_images !== false}
+                            imageLoading="eager"
+                            onMediaLoad={onMediaLoad}
                         />
-                    </span>
                 </span>
             </div>
         );
@@ -332,6 +357,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
             prevProps.settings.separate_message_backgrounds === nextProps.settings.separate_message_backgrounds &&
             prevProps.settings.message_background_mode === nextProps.settings.message_background_mode &&
             prevProps.settings.auto_load_images === nextProps.settings.auto_load_images &&
+            prevProps.onMediaLoad === nextProps.onMediaLoad &&
             prevProps.emotes.channelEmotes === nextProps.emotes.channelEmotes &&
             prevProps.emotes.globalEmotes === nextProps.emotes.globalEmotes
         );
@@ -345,6 +371,7 @@ const sanitizeFontFamily = (fontFamily: string): string => fontFamily.replace(/[
 const ChatOverlay: React.FC = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
+    const debugBackground = searchParams.get('debugBackground') === 'dark' ? 'dark' : 'transparent';
 
     const [settings, setSettings] = useState<ChatBoxSettings | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -372,15 +399,34 @@ const ChatOverlay: React.FC = () => {
 
         return {
             ['--chatbox-overlay-font' as string]: resolvedFontFamily,
-            width: `${settings?.chat_width || 100}vw`,
+            position: 'fixed',
+            inset: 0,
+            width: '100vw',
             height: '100vh',
-            padding: '16px',
+            padding: '0',
+            margin: 0,
             fontFamily: resolvedFontFamily,
             fontSize: `${settings?.font_size || 16}px`,
             fontWeight: settings?.font_weight || 'normal',
             color: settings?.text_color || '#FFFFFF',
-            backgroundColor: 'transparent',
+            backgroundColor: debugBackground === 'dark' ? '#05070d' : 'transparent',
             borderRadius: `${settings?.border_radius || 0}px`,
+            overflow: 'hidden',
+            boxSizing: 'border-box',
+        };
+    }, [settings, debugBackground]);
+
+    const chatFrameStyle = useMemo<React.CSSProperties>(() => {
+        if (!settings) return {};
+        const width = `${clampNumber(Number(settings.chat_width || 100), 20, 100)}%`;
+
+        return {
+            width,
+            maxWidth: '100vw',
+            height: '100%',
+            minWidth: 0,
+            marginLeft: '0',
+            marginRight: 'auto',
             overflow: 'hidden',
             boxSizing: 'border-box',
         };
@@ -390,6 +436,48 @@ const ChatOverlay: React.FC = () => {
         () => (settings ? resolveMessageBackgroundMode(settings) : 'message'),
         [settings]
     );
+
+    useEffect(() => {
+        const root = document.getElementById('root');
+        const previous = {
+            htmlBackground: document.documentElement.style.background,
+            htmlMargin: document.documentElement.style.margin,
+            htmlPadding: document.documentElement.style.padding,
+            bodyBackground: document.body.style.background,
+            bodyMargin: document.body.style.margin,
+            bodyPadding: document.body.style.padding,
+            rootBackground: root?.style.background || '',
+            rootMargin: root?.style.margin || '',
+            rootPadding: root?.style.padding || '',
+        };
+        const background = debugBackground === 'dark' ? '#05070d' : 'transparent';
+
+        document.documentElement.style.background = background;
+        document.documentElement.style.margin = '0';
+        document.documentElement.style.padding = '0';
+        document.body.style.background = background;
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        if (root) {
+            root.style.background = background;
+            root.style.margin = '0';
+            root.style.padding = '0';
+        }
+
+        return () => {
+            document.documentElement.style.background = previous.htmlBackground;
+            document.documentElement.style.margin = previous.htmlMargin;
+            document.documentElement.style.padding = previous.htmlPadding;
+            document.body.style.background = previous.bodyBackground;
+            document.body.style.margin = previous.bodyMargin;
+            document.body.style.padding = previous.bodyPadding;
+            if (root) {
+                root.style.background = previous.rootBackground;
+                root.style.margin = previous.rootMargin;
+                root.style.padding = previous.rootPadding;
+            }
+        };
+    }, [debugBackground]);
 
     useEffect(() => {
         const style = document.createElement('style');
@@ -715,9 +803,11 @@ const ChatOverlay: React.FC = () => {
                     }
                 }
 
-                setMessages(uniqueMessages);
+                const maxMessages = Math.max(1, settings?.max_messages || 20);
+                const visibleMessages = uniqueMessages.slice(-maxMessages);
+                setMessages(visibleMessages);
                 processedMessageIds.current = new Set(
-                    uniqueMessages.map(
+                    visibleMessages.map(
                         (msg) =>
                             msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`
                     )
@@ -743,15 +833,49 @@ const ChatOverlay: React.FC = () => {
         handleWebSocketMessage as (message: Record<string, unknown>) => void
     );
 
-    useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({
-                behavior: 'smooth',
+    const scrollToEnd = useCallback((behavior: ScrollBehavior = 'smooth'): void => {
+        const scroll = () => {
+            messagesEndRef.current?.scrollIntoView({
+                behavior,
                 block: settings?.chat_direction === 'horizontal' ? 'nearest' : 'end',
                 inline: settings?.chat_direction === 'horizontal' ? 'end' : 'nearest',
             });
+        };
+
+        scroll();
+        window.requestAnimationFrame(() => {
+            scroll();
+            window.requestAnimationFrame(scroll);
+        });
+    }, [settings?.chat_direction]);
+
+    const handleMediaLoad = useCallback((): void => {
+        scrollToEnd('auto');
+    }, [scrollToEnd]);
+
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            scrollToEnd('smooth');
         }
-    }, [messages, settings?.chat_direction]);
+    }, [messages, scrollToEnd]);
+
+    useEffect(() => {
+        const maxMessages = Math.max(1, settings?.max_messages || 20);
+        setMessages((prev) => {
+            if (prev.length <= maxMessages) {
+                return prev;
+            }
+
+            const nextMessages = prev.slice(-maxMessages);
+            processedMessageIds.current = new Set(
+                nextMessages.map(
+                    (msg) =>
+                        msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`
+                )
+            );
+            return nextMessages;
+        });
+    }, [settings?.max_messages]);
 
     useEffect(() => {
         const fadeSeconds = settings?.message_fade_seconds;
@@ -785,13 +909,6 @@ const ChatOverlay: React.FC = () => {
     }, [settings?.message_fade_seconds]);
 
     // Move hooks before early returns to comply with rules-of-hooks
-    const truncateWords = useCallback((text: string | undefined, maxWords: number = 6): string => {
-        if (!text) return '';
-        const words = text.trim().split(/\s+/);
-        if (words.length <= maxWords) return text;
-        return `${words.slice(0, maxWords).join(' ')}...`;
-    }, []);
-
     const handleNicknameClick = useCallback((e: React.MouseEvent): void => {
         e.preventDefault();
         e.stopPropagation();
@@ -807,7 +924,7 @@ const ChatOverlay: React.FC = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: 'transparent',
+                    background: debugBackground === 'dark' ? '#05070d' : 'transparent',
                     color: '#fff',
                     fontFamily: `${CHATBOX_BRAND_FONT}, sans-serif`,
                     gap: '16px',
@@ -828,10 +945,10 @@ const ChatOverlay: React.FC = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: 'transparent',
+                    background: debugBackground === 'dark' ? '#05070d' : 'transparent',
                     color: '#fff',
                     fontFamily: `${CHATBOX_BRAND_FONT}, sans-serif`,
-                    padding: '20px',
+                    padding: '0',
                     textAlign: 'center',
                     gap: '16px',
                 }}
@@ -862,10 +979,10 @@ const ChatOverlay: React.FC = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: 'transparent',
+                    background: debugBackground === 'dark' ? '#05070d' : 'transparent',
                     color: '#fff',
                     fontFamily: `${CHATBOX_BRAND_FONT}, sans-serif`,
-                    padding: '20px',
+                    padding: '0',
                     textAlign: 'center',
                     gap: '16px',
                 }}
@@ -970,7 +1087,8 @@ const ChatOverlay: React.FC = () => {
             </style>
 
             <div className="chatbox-overlay-font-scope" style={containerStyle}>
-                {messages.length === 0 ? (
+                <div style={chatFrameStyle}>
+                    {messages.length === 0 ? (
                     <div
                         style={{
                             display: 'flex',
@@ -991,7 +1109,7 @@ const ChatOverlay: React.FC = () => {
                             </div>
                         </div>
                     </div>
-                ) : (
+                    ) : (
                     <div
                         className={settings.chat_direction === 'horizontal' ? 'horizontal-chat-scroll' : ''}
                         style={{
@@ -1003,11 +1121,9 @@ const ChatOverlay: React.FC = () => {
                             overflowY: settings.chat_direction === 'horizontal' ? 'hidden' : 'auto',
                             alignItems: settings.chat_direction === 'horizontal' ? 'center' : 'stretch',
                             gap: settings.chat_direction === 'horizontal' ? '8px' : '0',
-                            paddingTop: settings.chat_direction === 'horizontal' ? '0' : `${Math.max(6, settings.message_spacing || 0)}px`,
-                            paddingBottom:
-                                settings.chat_direction === 'horizontal'
-                                    ? '0'
-                                    : `${Math.max(14, (settings.font_size || 16) * 1.15)}px`,
+                            width: '100%',
+                            paddingTop: '0',
+                            paddingBottom: '0',
                             boxSizing: 'border-box',
                             backgroundColor:
                                 messageBackgroundMode === 'column'
@@ -1021,10 +1137,7 @@ const ChatOverlay: React.FC = () => {
                                     : 'none',
                             paddingLeft: messageBackgroundMode === 'column' ? '8px' : '0',
                             paddingRight: messageBackgroundMode === 'column' ? '8px' : '0',
-                            scrollPaddingBlockEnd:
-                                settings.chat_direction === 'horizontal'
-                                    ? undefined
-                                    : `${Math.max(14, (settings.font_size || 16) * 1.15)}px`,
+                            scrollPaddingBlockEnd: settings.chat_direction === 'horizontal' ? undefined : '0',
                         }}
                     >
                         {settings.chat_direction !== 'horizontal' && <div style={{ flexGrow: 1 }} />}
@@ -1038,12 +1151,13 @@ const ChatOverlay: React.FC = () => {
                                 emotes={emotes}
                                 channelName={channelName}
                                 onNicknameClick={handleNicknameClick}
-                                truncateWords={truncateWords}
+                                onMediaLoad={handleMediaLoad}
                             />
                         ))}
                         <div ref={messagesEndRef} />
                     </div>
-                )}
+                    )}
+                </div>
             </div>
         </>
     );

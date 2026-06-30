@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
@@ -6,13 +6,23 @@ import GlobalPlayer from './GlobalPlayer';
 
 const usePlayerMock = vi.fn();
 const useGlobalPlayerMock = vi.fn();
-const youtubeComponentMock = vi.fn(({ videoId }: { videoId?: string }) => (
-    <div data-testid="youtube-player" data-video-id={videoId || ''} />
-));
-
-vi.mock('react-youtube', () => ({
-    default: (props: unknown) => youtubeComponentMock(props),
-}));
+const youtubePlayerConstructorMock = vi.fn();
+const youtubePlayerMock = {
+    playVideo: vi.fn(),
+    pauseVideo: vi.fn(),
+    setVolume: vi.fn(),
+    getVolume: vi.fn(() => 100),
+    isMuted: vi.fn(() => false),
+    mute: vi.fn(),
+    unMute: vi.fn(),
+    getCurrentTime: vi.fn(() => 0),
+    getDuration: vi.fn(() => 300),
+    getPlayerState: vi.fn(() => 1),
+    seekTo: vi.fn(),
+    loadVideoById: vi.fn(),
+    cueVideoById: vi.fn(),
+    destroy: vi.fn(),
+};
 
 vi.mock('@/context/PlayerContext', () => ({
     usePlayer: () => usePlayerMock(),
@@ -39,18 +49,31 @@ vi.mock('./player', () => ({
 
 describe('GlobalPlayer', () => {
     const markPlaybackStartedMock = vi.fn();
+    const handleStateChangeMock = vi.fn();
 
     beforeEach(() => {
         markPlaybackStartedMock.mockReset();
-        youtubeComponentMock.mockClear();
+        handleStateChangeMock.mockReset();
+        youtubePlayerConstructorMock.mockClear();
+        Object.values(youtubePlayerMock).forEach((mock) => mock.mockClear());
+        youtubePlayerMock.getVolume.mockReturnValue(100);
+        youtubePlayerMock.isMuted.mockReturnValue(false);
+        youtubePlayerMock.getCurrentTime.mockReturnValue(0);
+        youtubePlayerMock.getDuration.mockReturnValue(300);
+        youtubePlayerMock.getPlayerState.mockReturnValue(1);
+        window.YT = {
+            Player: youtubePlayerConstructorMock.mockImplementation(function (_elementId, options) {
+                window.setTimeout(() => {
+                    options.events.onReady({ target: youtubePlayerMock });
+                }, 0);
+                return youtubePlayerMock;
+            }),
+        };
         useGlobalPlayerMock.mockReturnValue({
             playerRef: { current: null },
             handleReady: vi.fn(),
-            handleEnded: vi.fn(),
             handleError: vi.fn(),
-            handleStateChange: vi.fn(),
-            handleApiPlay: vi.fn(),
-            handleApiPause: vi.fn(),
+            handleStateChange: handleStateChangeMock,
         });
 
         usePlayerMock.mockReturnValue({
@@ -80,6 +103,7 @@ describe('GlobalPlayer', () => {
             minimizePlayer: vi.fn(),
             maximizePlayer: vi.fn(),
             setPlayerRef: vi.fn(),
+            updateTime: vi.fn(),
             markPlaybackStarted: markPlaybackStartedMock,
             handlePlayerReady: vi.fn(),
             handlePlayerStateChange: vi.fn(),
@@ -88,20 +112,22 @@ describe('GlobalPlayer', () => {
         });
     });
 
-    it('enables native YouTube controls and does not render overlay hit-zones', () => {
+    it('enables native YouTube controls and does not render overlay hit-zones', async () => {
         render(
             <MemoryRouter initialEntries={['/dashboard/media']}>
                 <GlobalPlayer />
             </MemoryRouter>
         );
 
-        expect(screen.getByTestId('youtube-player')).toBeInTheDocument();
-        expect(youtubeComponentMock).toHaveBeenCalled();
+        expect(document.getElementById('global-youtube-player')).toBeInTheDocument();
+        await waitFor(() => expect(youtubePlayerConstructorMock).toHaveBeenCalled());
 
-        const props = youtubeComponentMock.mock.calls[0][0] as {
-            opts?: { playerVars?: { controls?: number } };
+        const options = youtubePlayerConstructorMock.mock.calls[0][1] as {
+            playerVars?: { controls?: number; enablejsapi?: number; rel?: number };
         };
-        expect(props.opts?.playerVars?.controls).toBe(1);
+        expect(options.playerVars?.controls).toBe(1);
+        expect(options.playerVars?.enablejsapi).toBe(1);
+        expect(options.playerVars?.rel).toBe(0);
         expect(document.querySelectorAll('[data-player-hit-zone]')).toHaveLength(0);
     });
 
@@ -117,5 +143,55 @@ describe('GlobalPlayer', () => {
 
         fireEvent.pointerDown(overlay!);
         expect(markPlaybackStartedMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('forwards native YouTube iframe state changes into the shared player state', async () => {
+        render(
+            <MemoryRouter initialEntries={['/dashboard/media']}>
+                <GlobalPlayer />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => expect(youtubePlayerConstructorMock).toHaveBeenCalled());
+        const options = youtubePlayerConstructorMock.mock.calls[0][1] as {
+            events?: { onStateChange?: (event: { data: number; target: typeof youtubePlayerMock }) => void };
+        };
+
+        options.events?.onStateChange?.({ data: 1, target: youtubePlayerMock });
+
+        expect(handleStateChangeMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: 1,
+                target: expect.objectContaining({
+                    playVideo: expect.any(Function),
+                    pauseVideo: expect.any(Function),
+                }),
+            })
+        );
+    });
+
+    it('forwards YouTube iframe postMessage state changes into the shared player state', () => {
+        render(
+            <MemoryRouter initialEntries={['/dashboard/media']}>
+                <GlobalPlayer />
+            </MemoryRouter>
+        );
+
+        window.dispatchEvent(
+            new MessageEvent('message', {
+                origin: 'https://www.youtube.com',
+                data: JSON.stringify({ event: 'onStateChange', info: 2 }),
+            })
+        );
+
+        expect(handleStateChangeMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: 2,
+                target: expect.objectContaining({
+                    playVideo: expect.any(Function),
+                    pauseVideo: expect.any(Function),
+                }),
+            })
+        );
     });
 });

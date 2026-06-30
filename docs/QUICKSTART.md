@@ -83,9 +83,21 @@ cd H:\Programming\raw_code\AI\Python\paidviewer_tools
 - `bot_service` на `8000`
 - `frontend` на `80`
 
+Если один из host-портов уже занят локальным сервисом, переопредели только внешний порт перед запуском. Внутри Docker сервисы всё равно общаются по стандартным портам:
+
+```powershell
+$env:POSTGRES_HOST_PORT="15432"
+$env:REDIS_HOST_PORT="16379"
+$env:BOT_SERVICE_HOST_PORT="18000"
+$env:TTS_GATEWAY_HOST_PORT="18010"
+$env:F5_TTS_SERVICE_HOST_PORT="18011"
+$env:FRONTEND_HOST_PORT="8080"
+.\start-dev.ps1
+```
+
 ### 4. Опционально включи TTS-профиль
 
-Gateway-only профиль нужен для проверки UI и маршрутизации без сборки тяжёлых model runtimes:
+Fake TTS профиль нужен для проверки UI, gateway и synth-маршрута без загрузки тяжёлых model runtimes:
 
 ```powershell
 .\start-dev.ps1 -WithCloudTtsFake
@@ -143,7 +155,7 @@ Gateway-only профиль нужен для проверки UI и маршр�
 - `http://localhost:8000/health`
 - `http://localhost:8000/api/tts/health?provider=f5` только если включён TTS-профиль
 - `http://localhost:8010/health/ready` для `-WithCloudTtsFake` или `-WithCloudTtsReal`
-- `http://localhost:8011/health/ready` только для `-WithCloudTtsReal`
+- `http://localhost:8011/health/ready` для `-WithCloudTtsFake` и `-WithCloudTtsReal`
 
 Официальный локальный путь теперь только `start-dev.ps1`, который использует `docker-compose.prod.yml + docker-compose.local.yml`.
 
@@ -196,6 +208,11 @@ Volumes удаляй только после бэкапа. Там могут б�
 
 Основной стек остаётся Docker-first, но `tts_worker_agent` по своей природе запускается отдельно на машине пользователя.
 
+Термины:
+
+- `server host` — наш управляемый серверный runtime: `frontend`, `bot_service`, `tts-gateway`, `f5-tts-service`
+- `self-host` — локальный runtime пользователя через `tts_worker_agent`
+
 ## Если нужен именно локальный dev без Docker
 
 Этот путь больше не считается основным стартовым сценарием.
@@ -221,6 +238,8 @@ python -m venv .venv
 4. Проверь локальную диагностику:
    - `http://127.0.0.1:46321/health`
    - `http://127.0.0.1:46321/diagnostics`
+
+Если в self-host нужно отдельно обрабатывать English inside Russian, можно оставить `providers.f5.endpoint_url` на `Misha RU`, а bilingual runtime указать в `providers.f5.mixed_language_endpoint_url`.
 
 Если нужен installer-managed автозапуск, это отдельное явное действие:
 

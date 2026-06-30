@@ -25,7 +25,7 @@ const Header: React.FC = () => {
     const pageTitles = useMemo(
         () => ({
             '/dashboard/tts/voices': 'Управление голосами',
-            '/dashboard/tts/local': 'Локальный TTS',
+            '/dashboard/tts/local': 'Self Hosted TTS',
             '/dashboard/tts': 'TTS ИИ озвучка',
             '/dashboard/youtube': 'YouTube заказы',
             '/dashboard/drops': 'Drops система',

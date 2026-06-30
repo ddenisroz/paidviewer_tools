@@ -35,7 +35,7 @@ describe('QueueList', () => {
         );
 
         expect(screen.getAllByText('Paid Donor').length).toBeGreaterThan(0);
-        expect(screen.getByText('Paid video')).toBeInTheDocument();
+        expect(screen.getByText('Платные заказы')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /Queue Test/i })).toHaveAttribute(
             'href',
             'https://youtube.com/watch?v=queue-video-1'

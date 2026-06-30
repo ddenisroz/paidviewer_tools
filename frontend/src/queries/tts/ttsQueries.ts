@@ -1,7 +1,14 @@
 ﻿/**
  * TTS Queries - централизованные React Query queries для TTS
  */
-import { QueryClient, useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
+import {
+    QueryClient,
+    useMutation,
+    UseMutationOptions,
+    useQuery,
+    useQueryClient,
+    UseQueryOptions,
+} from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { STORAGE_KEYS } from '@/constants';
@@ -22,7 +29,7 @@ import type {
 } from '../../types';
 import type { AxiosError } from 'axios';
 
-const isWrappedResponse = <T,>(value: unknown): value is ApiResponse<T> =>
+const isWrappedResponse = <T>(value: unknown): value is ApiResponse<T> =>
     Boolean(value) && typeof value === 'object' && 'success' in (value as Record<string, unknown>);
 
 const patchExactApiCache = <T extends object>(
@@ -52,38 +59,67 @@ const patchExactApiCache = <T extends object>(
     });
 };
 
-const patchStatusCaches = (queryClient: QueryClient, patch: Partial<TtsStatus>): void => {
-    queryClient.setQueriesData({ queryKey: ['tts', 'status'] }, (old: ApiResponse<TtsStatus> | TtsStatus | undefined) => {
-        if (!old) {
-            return {
-                success: true,
-                data: patch as TtsStatus,
-            } as ApiResponse<TtsStatus>;
-        }
+const mergeSettingsResponse = (
+    current: ApiResponse<TtsSettings> | TtsSettings | undefined,
+    response: ApiResponse<TtsSettings> | TtsSettings | undefined,
+    submitted: Partial<TtsSettings>
+): ApiResponse<TtsSettings> => {
+    const currentData = isWrappedResponse<TtsSettings>(current)
+        ? current.data || ({} as TtsSettings)
+        : ((current || {}) as TtsSettings);
+    const responseData = isWrappedResponse<TtsSettings>(response)
+        ? response.data
+        : response && typeof response === 'object' && !('success' in response)
+          ? (response as TtsSettings)
+          : undefined;
+    const responseVersion =
+        response && typeof response === 'object' && 'version' in response
+            ? Number((response as { version?: number }).version)
+            : undefined;
 
-        if (isWrappedResponse<TtsStatus>(old)) {
-            return {
-                ...old,
-                success: true,
-                data: {
-                    ...((old.data || {}) as TtsStatus),
-                    ...patch,
-                },
-            };
-        }
-
-        return {
-            ...(old as TtsStatus),
-            ...patch,
-        };
-    });
+    return {
+        success: true,
+        ...(isWrappedResponse<TtsSettings>(response) ? response : {}),
+        data: {
+            ...currentData,
+            ...submitted,
+            ...(responseData || {}),
+            ...(Number.isFinite(responseVersion) ? { version: responseVersion } : {}),
+        },
+    };
 };
 
-const patchLocalTtsConfigCache = (
-    queryClient: QueryClient,
-    provider: 'f5',
-    patch: Partial<LocalTtsConfig>
-): void => {
+const patchStatusCaches = (queryClient: QueryClient, patch: Partial<TtsStatus>): void => {
+    queryClient.setQueriesData(
+        { queryKey: ['tts', 'status'] },
+        (old: ApiResponse<TtsStatus> | TtsStatus | undefined) => {
+            if (!old) {
+                return {
+                    success: true,
+                    data: patch as TtsStatus,
+                } as ApiResponse<TtsStatus>;
+            }
+
+            if (isWrappedResponse<TtsStatus>(old)) {
+                return {
+                    ...old,
+                    success: true,
+                    data: {
+                        ...((old.data || {}) as TtsStatus),
+                        ...patch,
+                    },
+                };
+            }
+
+            return {
+                ...(old as TtsStatus),
+                ...patch,
+            };
+        }
+    );
+};
+
+const patchLocalTtsConfigCache = (queryClient: QueryClient, provider: 'f5', patch: Partial<LocalTtsConfig>): void => {
     queryClient.setQueryData(queryKeys.tts.localTtsConfig(provider), (old: LocalTtsConfig | null | undefined) => ({
         ...(old || { provider }),
         ...patch,
@@ -243,12 +279,14 @@ export const useSaveTtsSettings = (
         },
         onSuccess: (response, variables, onMutateResult, context) => {
             if (response?.success) {
-                queryClient.setQueryData(queryKeys.tts.settings(), response);
+                queryClient.setQueryData(
+                    queryKeys.tts.settings(),
+                    (old: ApiResponse<TtsSettings> | TtsSettings | undefined) =>
+                        mergeSettingsResponse(old, response, variables)
+                );
             }
             if (options?.onSuccess) {
                 options.onSuccess(response, variables, onMutateResult, context);
-            } else {
-                toast.success('Настройки TTS сохранены');
             }
         },
         onError: (error, newSettings, onMutateResult, context) => {
@@ -346,6 +384,28 @@ export const useSaveTtsPlatformSettings = (
     return useMutation({
         ...options,
         mutationFn: (settings: Record<string, unknown>) => unwrapResponse(ttsService.savePlatformSettings(settings)),
+        onMutate: async (newSettings, context) => {
+            if (options?.onMutate) {
+                await options.onMutate(newSettings, context);
+            }
+
+            await queryClient.cancelQueries({ queryKey: queryKeys.tts.platformSettings() });
+            const previousSettings = queryClient.getQueryData(queryKeys.tts.platformSettings());
+
+            queryClient.setQueryData(
+                queryKeys.tts.platformSettings(),
+                (old: ApiResponse<Record<string, unknown>> | undefined) => ({
+                    ...old,
+                    success: true,
+                    data: {
+                        ...((old?.data || {}) as Record<string, unknown>),
+                        ...newSettings,
+                    },
+                })
+            );
+
+            return { previousSettings };
+        },
         onSuccess: (response, variables, onMutateResult, context) => {
             if (response?.success) {
                 queryClient.setQueryData(queryKeys.tts.platformSettings(), response);
@@ -353,11 +413,13 @@ export const useSaveTtsPlatformSettings = (
 
             if (options?.onSuccess) {
                 options.onSuccess(response, variables, onMutateResult, context);
-            } else {
-                toast.success('Настройки платформы TTS сохранены');
             }
         },
         onError: (error, variables, onMutateResult, context) => {
+            const typedContext = onMutateResult as { previousSettings?: ApiResponse } | undefined;
+            if (typedContext?.previousSettings) {
+                queryClient.setQueryData(queryKeys.tts.platformSettings(), typedContext.previousSettings);
+            }
             logger.error('Error saving TTS platform settings:', error);
             if (options?.onError) {
                 options.onError(error, variables, onMutateResult, context);
@@ -394,6 +456,34 @@ export const useSaveTtsModeSettings = (
     return useMutation({
         ...options,
         mutationFn: (settings: Record<string, unknown>) => unwrapResponse(ttsService.saveModeSettings(settings)),
+        onMutate: async (newSettings, context) => {
+            if (options?.onMutate) {
+                await options.onMutate(newSettings, context);
+            }
+
+            await queryClient.cancelQueries({ queryKey: queryKeys.tts.modeSettings() });
+            const previousSettings = queryClient.getQueryData(queryKeys.tts.modeSettings());
+
+            queryClient.setQueryData(
+                queryKeys.tts.modeSettings(),
+                (old: ApiResponse<Record<string, unknown>> | Record<string, unknown> | undefined) => {
+                    const oldData = isWrappedResponse<Record<string, unknown>>(old)
+                        ? old.data || {}
+                        : ((old || {}) as Record<string, unknown>);
+
+                    return {
+                        ...(isWrappedResponse<Record<string, unknown>>(old) ? old : {}),
+                        success: true,
+                        data: {
+                            ...oldData,
+                            ...newSettings,
+                        },
+                    };
+                }
+            );
+
+            return { previousSettings };
+        },
         onSuccess: (response, variables, onMutateResult, context) => {
             if (response?.success) {
                 queryClient.setQueryData(queryKeys.tts.modeSettings(), response);
@@ -401,11 +491,13 @@ export const useSaveTtsModeSettings = (
 
             if (options?.onSuccess) {
                 options.onSuccess(response, variables, onMutateResult, context);
-            } else {
-                toast.success('Настройки режима TTS сохранены');
             }
         },
         onError: (error, variables, onMutateResult, context) => {
+            const typedContext = onMutateResult as { previousSettings?: ApiResponse } | undefined;
+            if (typedContext?.previousSettings) {
+                queryClient.setQueryData(queryKeys.tts.modeSettings(), typedContext.previousSettings);
+            }
             logger.error('Error saving TTS mode settings:', error);
             if (options?.onError) {
                 options.onError(error, variables, onMutateResult, context);
@@ -503,8 +595,6 @@ export const useToggleTts = (options?: UseMutationOptions<ApiResponse, AxiosErro
             patchStatusCaches(queryClient, { enabled: variables });
             if (options?.onSuccess) {
                 options.onSuccess(data, variables, onMutateResult, context);
-            } else {
-                toast.success('TTS переключен');
             }
         },
         onError: (error, variables, onMutateResult, context) => {
@@ -526,7 +616,7 @@ export const useSetTtsListeningMode = (options?: UseMutationOptions<ApiResponse,
 
     return useMutation({
         mutationFn: (mode: string) => unwrapResponse(ttsService.setListeningMode({ listeningMode: mode })),
-        onSuccess: (_response, mode) => {
+        onSuccess: (_response, mode, onMutateResult, context) => {
             const normalizedMode = mode === 'obs' ? 'obs' : 'website';
             patchExactApiCache<TtsSettings>(queryClient, queryKeys.tts.settings(), { listeningMode: mode });
             patchStatusCaches(queryClient, { listening_mode: normalizedMode as TtsStatus['listening_mode'] });
@@ -538,13 +628,15 @@ export const useSetTtsListeningMode = (options?: UseMutationOptions<ApiResponse,
                     })
                 );
             }
-            if (!options?.onSuccess) {
-                toast.success('Режим прослушивания обновлен');
+            if (options?.onSuccess) {
+                options.onSuccess(_response, mode, onMutateResult, context);
             }
         },
-        onError: (error: AxiosError) => {
+        onError: (error: AxiosError, variables, onMutateResult, context) => {
             logger.error('Error setting listening mode:', error);
-            if (!options?.onError) {
+            if (options?.onError) {
+                options.onError(error, variables, onMutateResult, context);
+            } else {
                 toast.error('Ошибка обновления режима прослушивания');
             }
         },
@@ -560,7 +652,7 @@ export const useSetTtsEngine = (options?: UseMutationOptions<ApiResponse, AxiosE
 
     return useMutation({
         mutationFn: (engineType: string) => unwrapResponse(ttsService.setEngine({ engine_type: engineType })),
-        onSuccess: (_response, engineType) => {
+        onSuccess: (_response, engineType, onMutateResult, context) => {
             patchStatusCaches(queryClient, { engine_type: engineType as TtsStatus['engine_type'] });
             patchExactApiCache<TtsSettings>(queryClient, queryKeys.tts.settings(), engineSettingsPatch(engineType));
             if (engineType === 'f5_local') {
@@ -570,13 +662,15 @@ export const useSetTtsEngine = (options?: UseMutationOptions<ApiResponse, AxiosE
             } else {
                 patchStatusCaches(queryClient, { f5_mode: 'cloud', mode: 'cloud', advanced_provider: 'f5' });
             }
-            if (!options?.onSuccess) {
-                toast.success('Движок TTS обновлен');
+            if (options?.onSuccess) {
+                options.onSuccess(_response, engineType, onMutateResult, context);
             }
         },
-        onError: (error: AxiosError) => {
+        onError: (error: AxiosError, variables, onMutateResult, context) => {
             logger.error('Error setting TTS engine:', error);
-            if (!options?.onError) {
+            if (options?.onError) {
+                options.onError(error, variables, onMutateResult, context);
+            } else {
                 toast.error('Ошибка обновления движка TTS');
             }
         },
@@ -592,16 +686,18 @@ export const useRegenerateTtsObsUrl = (options?: UseMutationOptions<ApiResponse,
 
     return useMutation({
         mutationFn: () => unwrapResponse(ttsService.regenerateObsUrl()),
-        onSuccess: (response) => {
+        onSuccess: (response, variables, onMutateResult, context) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.obsUrl() });
-            if (!options?.onSuccess) {
-                toast.success('OBS URL регенерирован');
+            if (options?.onSuccess) {
+                options.onSuccess(response, variables, onMutateResult, context);
             }
             return response;
         },
-        onError: (error: AxiosError) => {
+        onError: (error: AxiosError, variables, onMutateResult, context) => {
             logger.error('Error regenerating OBS URL:', error);
-            if (!options?.onError) {
+            if (options?.onError) {
+                options.onError(error, variables, onMutateResult, context);
+            } else {
                 toast.error('Ошибка регенерации OBS URL');
             }
         },
@@ -643,7 +739,36 @@ export const useCreateTtsReward = (
 };
 
 /**
- * Удалить TTS награду для платформы
+ * Привязать существующую TTS награду платформы
+ */
+export const useAttachTtsReward = (
+    options?: UseMutationOptions<ApiResponse, AxiosError, { platform: string; reward_id: string }, unknown>
+) => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: { platform: string; reward_id: string }) => unwrapResponse(ttsService.attachTtsReward(data)),
+        onSuccess: (response) => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.tts.modeSettings() });
+            if (!options?.onSuccess) {
+                toast.success('Награда привязана');
+            }
+            return response;
+        },
+        onError: (error: AxiosError) => {
+            logger.error('Error attaching TTS reward:', error);
+            if (!options?.onError) {
+                const errorData = error.response?.data as Record<string, unknown> | undefined;
+                const errorMessage = (errorData?.detail || errorData?.message || 'Ошибка привязки награды') as string;
+                toast.error(errorMessage);
+            }
+        },
+        ...options,
+    });
+};
+
+/**
+ * Отвязать TTS награду для платформы
  */
 export const useDeleteTtsReward = (options?: UseMutationOptions<ApiResponse, AxiosError, string, unknown>) => {
     const queryClient = useQueryClient();
@@ -653,7 +778,7 @@ export const useDeleteTtsReward = (options?: UseMutationOptions<ApiResponse, Axi
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.modeSettings() });
             if (!options?.onSuccess) {
-                toast.success('Награда удалена');
+                toast.success('Награда отвязана');
             }
         },
         onError: (error: AxiosError) => {
@@ -716,13 +841,16 @@ export const useSaveLocalTtsConfig = (
             const provider = (nextConfig?.provider as 'f5' | undefined) || 'f5';
             await queryClient.cancelQueries({ queryKey: queryKeys.tts.localTtsConfig(provider) });
 
-            const previousConfig = queryClient.getQueryData<LocalTtsConfig | null>(queryKeys.tts.localTtsConfig(provider));
+            const previousConfig = queryClient.getQueryData<LocalTtsConfig | null>(
+                queryKeys.tts.localTtsConfig(provider)
+            );
             patchLocalTtsConfigCache(queryClient, provider, {
                 endpoint_url: nextConfig.endpoint_url,
                 use_local: nextConfig.use_local,
                 configured: Boolean(nextConfig.endpoint_url || previousConfig?.configured),
                 provider,
-                has_api_key: nextConfig.api_key !== undefined ? Boolean(nextConfig.api_key) : previousConfig?.has_api_key,
+                has_api_key:
+                    nextConfig.api_key !== undefined ? Boolean(nextConfig.api_key) : previousConfig?.has_api_key,
             });
 
             if (nextConfig.endpoint_url) {
@@ -786,12 +914,8 @@ export const useTestLocalTtsConnection = (
 ) => {
     return useMutation({
         ...options,
-        mutationFn: (params: {
-            endpoint_url: string;
-            api_key?: string;
-            provider?: 'f5';
-            use_local?: boolean;
-        }) => unwrapResponse(ttsService.testLocalTtsConnection(params)),
+        mutationFn: (params: { endpoint_url: string; api_key?: string; provider?: 'f5'; use_local?: boolean }) =>
+            unwrapResponse(ttsService.testLocalTtsConnection(params)),
         onSuccess: (response, variables, onMutateResult, context) => {
             if (options?.onSuccess) {
                 options.onSuccess(response, variables, onMutateResult, context);
@@ -832,7 +956,9 @@ export const useToggleLocalTts = (options?: UseMutationOptions<ApiResponse, Axio
             }
 
             await queryClient.cancelQueries({ queryKey: queryKeys.tts.localTtsConfig(provider) });
-            const previousConfig = queryClient.getQueryData<LocalTtsConfig | null>(queryKeys.tts.localTtsConfig(provider));
+            const previousConfig = queryClient.getQueryData<LocalTtsConfig | null>(
+                queryKeys.tts.localTtsConfig(provider)
+            );
             const previousStatus = queryClient.getQueriesData({ queryKey: ['tts', 'status'] });
             const nextUseLocal = !previousConfig?.use_local;
 
@@ -866,14 +992,16 @@ export const useToggleLocalTts = (options?: UseMutationOptions<ApiResponse, Axio
             if (options?.onSuccess) {
                 options.onSuccess(response, provider, onMutateResult, context);
             } else {
-                toast.success(response?.message || 'Локальный TTS переключен');
+                toast.success(response?.message || 'Self Hosted TTS переключен');
             }
         },
         onError: (error: AxiosError, variables, onMutateResult, context) => {
-            const typedContext = onMutateResult as {
-                previousConfig?: LocalTtsConfig | null;
-                previousStatus?: Array<[readonly unknown[], unknown]>;
-            } | undefined;
+            const typedContext = onMutateResult as
+                | {
+                      previousConfig?: LocalTtsConfig | null;
+                      previousStatus?: Array<[readonly unknown[], unknown]>;
+                  }
+                | undefined;
             if (typedContext?.previousConfig) {
                 queryClient.setQueryData(queryKeys.tts.localTtsConfig(variables), typedContext.previousConfig);
             }

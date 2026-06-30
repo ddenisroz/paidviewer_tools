@@ -358,6 +358,14 @@ class MemeAlertsService:
                 return item
         return None
 
+    @staticmethod
+    def _reward_accepts_message(platform: str, reward: Dict[str, Any]) -> bool:
+        if platform == "twitch":
+            return reward.get("is_user_input_required") is True
+        if platform == "vk":
+            return reward.get("is_message_required") is True
+        return False
+
     async def create_points_reward(
         self,
         *,
@@ -439,6 +447,80 @@ class MemeAlertsService:
         return {
             "platform": normalized_platform,
             "reward_id": str(reward_id),
+            "reward_title": reward_title,
+            "coins_amount": reward_coins,
+            "reward_cost": reward_cost,
+            "local_id": local_reward_id,
+            "settings": next_item,
+            "all_settings": settings,
+        }
+
+    async def attach_points_reward(
+        self,
+        *,
+        user_id: int,
+        platform: str,
+        reward_id: str,
+        coins_amount: int,
+        local_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        normalized_platform = (platform or "").strip().lower()
+        if normalized_platform not in ("twitch", "vk"):
+            raise ValueError("Unsupported platform")
+
+        normalized_reward_id = self._clean_optional_str(reward_id)
+        if not normalized_reward_id:
+            raise ValueError("Reward id is required")
+
+        from services.platform_rewards_service import get_platform_rewards_service
+
+        rewards = await get_platform_rewards_service().get_rewards(user_id, normalized_platform, self.db)
+        reward = next((item for item in rewards if str(item.get("id")) == normalized_reward_id), None)
+        if not reward:
+            raise ValueError("Reward not found")
+        if not self._reward_accepts_message(normalized_platform, reward):
+            raise ValueError("MemeAlerts requires a reward with user message input enabled")
+
+        settings = self.get_settings(user_id)
+        items = list(settings.get("points_rewards", []))
+        existing_item = self._find_reward_item(settings, local_id)
+        if not existing_item and len(items) >= 3:
+            raise ValueError("РњРѕР¶РЅРѕ СЃРѕР·РґР°С‚СЊ РЅРµ Р±РѕР»СЊС€Рµ 3 РЅР°РіСЂР°Рґ MemeAlerts")
+
+        reward_title = self._clean_optional_str(reward.get("title")) or self._clean_optional_str(reward.get("name")) or "MemeCoins"
+        reward_cost = self._safe_int(reward.get("cost", reward.get("price")), 500, minimum=1)
+        reward_coins = self._safe_int(coins_amount, 10, minimum=1)
+        local_reward_id = (
+            self._clean_optional_str(local_id)
+            or self._clean_optional_str(existing_item.get("local_id") if existing_item else None)
+            or uuid.uuid4().hex
+        )
+
+        next_item = {
+            "local_id": local_reward_id,
+            "platform": normalized_platform,
+            "enabled": True,
+            "reward_id": normalized_reward_id,
+            "reward_title": reward_title,
+            "coins_amount": reward_coins,
+            "reward_cost": reward_cost,
+            "cooldown_seconds": self._safe_int(reward.get("global_cooldown_seconds"), 0, minimum=0, maximum=86_400),
+        }
+        replaced = False
+        next_items: List[Dict[str, Any]] = []
+        for item in items:
+            if isinstance(item, dict) and item.get("local_id") == local_reward_id:
+                next_items.append(next_item)
+                replaced = True
+            else:
+                next_items.append(item)
+        if not replaced:
+            next_items.append(next_item)
+
+        settings = self.save_settings(user_id, {"points_rewards": next_items})
+        return {
+            "platform": normalized_platform,
+            "reward_id": normalized_reward_id,
             "reward_title": reward_title,
             "coins_amount": reward_coins,
             "reward_cost": reward_cost,
@@ -688,6 +770,12 @@ class MemeAlertsService:
     def _safe_iso(value: Any) -> Optional[str]:
         if value is None:
             return None
+        if isinstance(value, datetime):
+            try:
+                normalized = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+                return normalized.astimezone(timezone.utc).isoformat()
+            except Exception:
+                return str(value)
         if hasattr(value, "isoformat"):
             try:
                 return value.isoformat()
@@ -1288,6 +1376,8 @@ class MemeAlertsService:
             return {
                 "success": False,
                 "error": str(exc),
+                "history": [],
+                "local_grants": [],
                 "grants": [],
                 "purchases": [],
                 "unknown": [],
@@ -1296,7 +1386,7 @@ class MemeAlertsService:
         grants = self._read_local_grants(user_id=user_id, limit=limit)
         decoded = self._decode_token(access_token)
         streamer_id = self._resolve_streamer_id(decoded, platform_user_id)
-        purchases: List[Dict[str, Any]] = []
+        remote_history: List[Dict[str, Any]] = []
 
         if not streamer_id:
             logger.warning(
@@ -1310,13 +1400,16 @@ class MemeAlertsService:
                     limit=limit,
                     client=shared_client,
                 )
-            purchases = self._normalize_supporters(supporters)
+            remote_history = self._normalize_supporters(supporters)
 
         return {
             "success": True,
+            "history": remote_history,
+            "local_grants": grants,
             "grants": grants,
-            "purchases": purchases,
+            "purchases": remote_history,
             "unknown": [],
+            "source": "memealerts_supporters",
         }
 
     async def fetch_balances(self, user_id: int, limit: int = 200) -> Dict[str, Any]:
@@ -1535,7 +1628,14 @@ class MemeAlertsService:
                     return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
                 except (OSError, OverflowError, ValueError):
                     return text
-            return text
+            try:
+                normalized_text = text.replace("Z", "+00:00")
+                parsed = datetime.fromisoformat(normalized_text)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return parsed.astimezone(timezone.utc).isoformat()
+            except ValueError:
+                return text
 
         return str(raw_value)
 

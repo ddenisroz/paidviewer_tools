@@ -123,6 +123,18 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if path == "/api/worker-agent/poll":
             return status_code >= 400
 
+        if path == "/api/tts/obs-status":
+            return status_code >= 400
+
+        if path in {
+            "/api/chat/status",
+            "/api/auth/status",
+            "/api/auth/ws-token",
+            "/api/tts/status",
+            "/api/youtube/queue",
+        }:
+            return status_code >= 400
+
         if status_code == 401:
             polling_endpoints = [
                 "/api/user-settings/",

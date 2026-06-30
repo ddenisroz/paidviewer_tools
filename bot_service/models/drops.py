@@ -93,8 +93,13 @@ class DropsConfig(Base):
     widget_result_duration_ms = Column(Integer, default=5500)
     widget_closing_duration_ms = Column(Integer, default=500)
     widget_spin_sound_file = Column(String, nullable=True)
+    widget_start_sound_file = Column(String, nullable=True)
     widget_reveal_sound_file = Column(String, nullable=True)
     widget_sound_volume = Column(Float, default=1.0)
+    widget_frame_color = Column(String, nullable=True, default="#ff8a00")
+    widget_text_color = Column(String, nullable=True, default="#ffffff")
+    widget_background_color = Column(String, nullable=True, default="#120821")
+    widget_font_scale = Column(Float, default=1.0)
     widget_token = Column(String, nullable=True, unique=True, index=True)
 
     created_at = Column(DateTime, default=utcnow_naive)
@@ -232,6 +237,42 @@ class DropsHistory(Base):
     chat_message_id = Column(Integer, nullable=True)
 
     created_at = Column(DateTime, default=utcnow_naive, index=True)
+
+
+class PendingStreakChest(Base):
+    """A viewer streak chest waiting to be opened."""
+
+    __tablename__ = "pending_streak_chests"
+    __table_args__ = (
+        CheckConstraint(
+            "(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)",
+            name="check_user_or_session_pending_streak_chest",
+        ),
+        {"extend_existing": True},
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    session_id = Column(String, nullable=True, index=True)
+    channel_name = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False, index=True)
+    viewer_id = Column(String, nullable=False, index=True)
+    viewer_name = Column(String, nullable=False)
+
+    quality_id = Column(Integer, ForeignKey("drops_qualities.id"), nullable=False)
+    quality_name = Column(String, nullable=False)
+    streak_days = Column(Integer, nullable=False)
+    messages_count = Column(Integer, nullable=True)
+    source_event_id = Column(String, nullable=True, index=True)
+    chat_message_id = Column(Integer, nullable=True)
+    stream_session_id = Column(Integer, ForeignKey("stream_sessions.id"), nullable=True, index=True)
+
+    status = Column(String, nullable=False, default="pending", index=True)
+    opened_history_id = Column(Integer, ForeignKey("drops_history.id"), nullable=True)
+    opened_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=utcnow_naive, index=True)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
 
 class MemeAlertsGrantHistory(Base):

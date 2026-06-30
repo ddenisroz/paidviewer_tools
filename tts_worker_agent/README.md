@@ -76,6 +76,17 @@ python -m venv .venv
 
 - F5 runtime: `POST /api/tts/synthesize-channel`
 
+### Важный нюанс про английские слова
+
+Если нужно нормально читать English inside Russian, одного checkpoint `Misha RU` недостаточно.
+Правильный production-вариант для self-host:
+
+- либо локальный runtime сам маршрутизирует mixed/EN текст на EN-capable или bilingual F5 checkpoint;
+- либо `endpoint_url` в `providers.f5` уже смотрит на такой runtime;
+- либо в `config.json` у `providers.f5` отдельно задан `mixed_language_endpoint_url`, и агент сам отправляет mixed/EN задания туда.
+
+Простая подмена латинских букв на кириллицу не рекомендуется: она ухудшает произношение и ломает часть текста.
+
 ## Важные замечания
 
 - На Windows секреты агента хранятся через DPAPI best-effort.

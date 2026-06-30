@@ -30,8 +30,13 @@ export interface DropsConfig {
     widget_opening_duration_ms?: number;
     widget_result_duration_ms?: number;
     widget_spin_sound_file?: string;
+    widget_start_sound_file?: string;
     widget_reveal_sound_file?: string;
     widget_sound_volume?: number;
+    widget_frame_color?: string;
+    widget_text_color?: string;
+    widget_background_color?: string;
+    widget_font_scale?: number;
     [key: string]: string | number | boolean | undefined;
 }
 

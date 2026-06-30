@@ -103,20 +103,23 @@ const initialState: PlayerState = {
     error: null,
 };
 
-const MINI_PLAYER_MINIMIZED_STORAGE_KEY = 'yt_player_minimized';
 const YOUTUBE_VOLUME_STORAGE_KEY = 'yt_volume';
+const YOUTUBE_MINIMIZED_STORAGE_KEY = 'yt_player_minimized';
 const YOUTUBE_PLAYBACK_SYNC_STORAGE_KEY = 'yt_playback_sync';
 
-const initializePlayerState = (baseState: PlayerState): PlayerState => {
+const getInitialPlayerState = (): PlayerState => {
     if (typeof window === 'undefined') {
-        return baseState;
+        return initialState;
     }
 
-    const isMinimized = window.localStorage.getItem(MINI_PLAYER_MINIMIZED_STORAGE_KEY) === '1';
-    return {
-        ...baseState,
-        isMinimized,
-    };
+    try {
+        return {
+            ...initialState,
+            isMinimized: window.localStorage.getItem(YOUTUBE_MINIMIZED_STORAGE_KEY) === 'true',
+        };
+    } catch {
+        return initialState;
+    }
 };
 
 const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState => {
@@ -130,6 +133,7 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
                 ...state,
                 currentVideo: action.payload,
                 isVisible: !!action.payload,
+                isMinimized: action.payload ? state.isMinimized : false,
                 error: null,
             };
         case 'SET_PLAYING':
@@ -172,6 +176,7 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
                 isPlaying,
                 skipVotes,
                 isVisible: hasQueue,
+                isMinimized: hasQueue ? state.isMinimized : false,
                 isLoading: false,
                 error: null,
             };
@@ -184,6 +189,7 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
                 userPaused: false,
                 isPlaying: hasNextVideo,
                 isVisible: hasNextVideo,
+                isMinimized: hasNextVideo ? state.isMinimized : false,
             };
         }
         case 'TOGGLE_PLAY_PAUSE':
@@ -244,7 +250,7 @@ interface PlayerProviderProps {
 }
 
 export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
-    const [state, dispatch] = useReducer(playerReducer, initialState, initializePlayerState);
+    const [state, dispatch] = useReducer(playerReducer, undefined, getInitialPlayerState);
     const lastUpdateTimeRef = useRef<number>(0);
     const volumeSaveTimeoutRef = useRef<number | null>(null);
     const lastSavedVolumeRef = useRef<number | null>(null);
@@ -309,11 +315,15 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
 
         try {
-            window.localStorage.setItem(MINI_PLAYER_MINIMIZED_STORAGE_KEY, state.isMinimized ? '1' : '0');
+            if (state.currentVideo || state.queue.length > 0) {
+                window.localStorage.setItem(YOUTUBE_MINIMIZED_STORAGE_KEY, String(state.isMinimized));
+            } else {
+                window.localStorage.removeItem(YOUTUBE_MINIMIZED_STORAGE_KEY);
+            }
         } catch (error) {
-            logger.debug('[YouTube] Failed to persist mini-player minimized state', error);
+            logger.debug('[YouTube] Failed to persist minimized state', error);
         }
-    }, [state.isMinimized]);
+    }, [state.currentVideo, state.isMinimized, state.queue.length]);
 
     useEffect(() => {
         if (!state.playerRef) {
@@ -412,14 +422,6 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
 
         const handleStorage = (event: StorageEvent): void => {
-            if (event.key === MINI_PLAYER_MINIMIZED_STORAGE_KEY && event.newValue !== null) {
-                const shouldMinimize = event.newValue === '1';
-                if (shouldMinimize !== state.isMinimized) {
-                    dispatch({ type: shouldMinimize ? 'MINIMIZE_PLAYER' : 'MAXIMIZE_PLAYER' });
-                }
-                return;
-            }
-
             if (event.key === YOUTUBE_VOLUME_STORAGE_KEY && event.newValue !== null) {
                 const parsedVolume = Number(event.newValue);
                 if (!Number.isNaN(parsedVolume)) {
@@ -481,7 +483,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         return () => {
             window.removeEventListener('storage', handleStorage);
         };
-    }, [refetchQueue, state.isMinimized, state.playerRef, state.userPaused]);
+    }, [refetchQueue, state.playerRef, state.userPaused]);
 
     const skipVideoMutation = useSkipYoutubeVideo({
         onSuccess: (response) => {
@@ -736,16 +738,21 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 // Если мы дошли до PLAYING, считаем это пользовательским запуском.
                 window.ytUserStarted = true;
             }
+            broadcastPlaybackSync('play');
             dispatch({ type: 'SET_PLAYING', payload: true });
             dispatch({ type: 'SET_USER_PAUSED', payload: false });
             dispatch({ type: 'SET_VISIBLE', payload: true });
             window.ytUserStarted = true;
             logger.debug('▶ [YOUTUBE] Playing, mini-player visible');
         } else if (playerState === 2) {
-            const wasUserPause = pauseReasonRef.current === 'user';
+            const wasSystemPause = pauseReasonRef.current === 'system';
+            const wasUserPause = !wasSystemPause;
             pauseReasonRef.current = null;
             dispatch({ type: 'SET_PLAYING', payload: false });
             dispatch({ type: 'SET_USER_PAUSED', payload: wasUserPause });
+            if (wasUserPause) {
+                broadcastPlaybackSync('pause');
+            }
             logger.debug('⏸ [YOUTUBE] Paused');
         } else if (playerState === 0) {
             logger.debug('[SKIP] [YOUTUBE] Video ended, switching to next');

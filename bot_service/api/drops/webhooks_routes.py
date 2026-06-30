@@ -14,6 +14,7 @@ from core.config import settings
 from auth.auth import get_current_user
 from repositories.user_repository import UserRepository
 from repositories.drops_reward_repository import DropsRewardRepository
+from services.donations.donationalerts_provider import DonationAlertsProvider
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/drops', tags=['drops'])
 
@@ -374,18 +375,25 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
         from services.drops.drops_service import DropsService
         from services.memealerts_service import MemeAlertsService
         data = await request.json()
-        donation_amount = data.get('amount', 0)
-        donor_name = data.get('username', 'Anonymous')
-        donor_id = data.get('user_id', 'unknown')
-        message = data.get('message', '')
-        alert_id = str(data.get('id') or data.get('alert_id') or data.get('uuid') or '').strip()
-        if not alert_id:
-            alert_id = f"{data.get('user_id', 'unknown')}:{donor_name}:{donation_amount}:{data.get('created_at') or data.get('date') or message}"
-        logger.info(f'[DONATION DROPS] Received donation: {donor_name} - {donation_amount}')
+        donation_event = await DonationAlertsProvider().normalize_event(data)
+        donation_amount = donation_event.amount_rub
+        donor_name = donation_event.donor_name
+        donor_id = donation_event.donor_id
+        message = donation_event.message
+        alert_id = donation_event.event_id
+        logger.info(
+            "[DONATION DROPS] Received donation provider=%s donor=%s amount_original=%s currency=%s amount_rub=%s rate_source=%s",
+            donation_event.provider,
+            donor_name,
+            donation_event.amount_original,
+            donation_event.currency_original,
+            donation_event.amount_rub,
+            donation_event.rate_source,
+        )
         user_repo = UserRepository(db)
-        user_token = user_repo.get_token_by_platform('donationalerts', data.get('user_id', ''))
+        user_token = user_repo.get_token_by_platform('donationalerts', donation_event.provider_user_id)
         if not user_token:
-            logger.warning(f"No user found for DonationAlerts ID: {data.get('user_id')}")
+            logger.warning("No user found for DonationAlerts ID: %s", donation_event.provider_user_id)
             return {'success': True, 'processed': False, 'message': 'User for the DonationAlerts webhook was not found.'}
         user = user_repo.get_by_id(user_token.user_id)
         if not user:
@@ -401,7 +409,7 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
                 logger.info(f'[DONATION RECORD] Donation {alert_id} already processed')
                 return {'success': True, 'processed': False, 'duplicate': True, 'message': 'Donation already processed.'}
             if not existing_donation:
-                donation_record = DonationAlert(user_id=user_token.user_id, channel_name=channel_name, amount=float(donation_amount), currency=data.get('currency', 'RUB'), message=message, alert_id=alert_id, is_processed=False)
+                donation_record = DonationAlert(user_id=user_token.user_id, channel_name=channel_name, amount=float(donation_event.amount_original), currency=donation_event.currency_original, message=message, alert_id=alert_id, is_processed=False)
                 db.add(donation_record)
                 logger.info(f'[DONATION RECORD] Saved donation {alert_id}')
             else:
@@ -419,14 +427,51 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
                 settings_row = TTSSettingsRepository(db).get_or_create(user_id=user_token.user_id)
                 youtube_settings = build_youtube_settings_response(getattr(settings_row, "youtube_settings", None))
                 donation_value = _safe_amount(donation_amount)
-                rate_per_minute = _safe_amount(youtube_settings.get("donationalerts_video_min_amount"))
+                paid_orders_enabled = bool(
+                    youtube_settings.get("paid_orders_enabled")
+                    or youtube_settings.get("donationalerts_video_enabled")
+                )
+                paid_order_mode = youtube_settings.get("paid_order_mode") or "rub_per_minute"
+                rate_per_minute = _safe_amount(
+                    youtube_settings.get("paid_order_rate_rub_per_minute")
+                    if youtube_settings.get("paid_order_rate_rub_per_minute") is not None
+                    else youtube_settings.get("donationalerts_video_min_amount")
+                )
+                full_video_min_amount = _safe_amount(
+                    youtube_settings.get("paid_order_min_amount_rub")
+                    if youtube_settings.get("paid_order_min_amount_rub") is not None
+                    else youtube_settings.get("donationalerts_video_min_amount")
+                )
+                priority_by_amount = bool(youtube_settings.get("paid_order_priority_by_amount"))
+                priority_next = bool(youtube_settings.get("donationalerts_video_priority_next", True))
                 youtube_url = _extract_first_youtube_url(message)
-                if (
-                    youtube_settings.get("donationalerts_video_enabled")
-                    and youtube_url
-                ):
+                if paid_orders_enabled and youtube_url:
                     queue_service = QueueService()
-                    if rate_per_minute > 0:
+                    if paid_order_mode == "full_video":
+                        required_amount = full_video_min_amount
+                        if donation_value + 1e-9 < required_amount:
+                            youtube_result = {
+                                "success": False,
+                                "error": f"Paid video donation requires {required_amount:g} RUB.",
+                            }
+                        else:
+                            youtube_result = await queue_service.add_video_to_user_queue(
+                                user_id=user_token.user_id,
+                                video_url=youtube_url,
+                                channel_name=channel_name,
+                                platform="donationalerts",
+                                requester_name=donor_name,
+                                requester_id=str(donor_id),
+                                is_paid=True,
+                                paid_source="donationalerts",
+                                paid_amount=donation_value,
+                                paid_currency="RUB",
+                                source_alert_id=alert_id,
+                                priority_next=priority_next and not priority_by_amount,
+                                priority_by_amount=priority_by_amount,
+                                db=db,
+                            )
+                    elif rate_per_minute > 0:
                         video_info = await queue_service.youtube_service.get_video_info(youtube_url)
                         if not video_info:
                             youtube_result = {
@@ -453,9 +498,10 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
                                     is_paid=True,
                                     paid_source="donationalerts",
                                     paid_amount=donation_value,
-                                    paid_currency=str(data.get("currency") or "RUB"),
+                                    paid_currency="RUB",
                                     source_alert_id=alert_id,
-                                    priority_next=True,
+                                    priority_next=priority_next and not priority_by_amount,
+                                    priority_by_amount=priority_by_amount,
                                     db=db,
                                 )
                     else:
@@ -469,9 +515,10 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
                             is_paid=True,
                             paid_source="donationalerts",
                             paid_amount=donation_value,
-                            paid_currency=str(data.get("currency") or "RUB"),
+                            paid_currency="RUB",
                             source_alert_id=alert_id,
-                            priority_next=True,
+                            priority_next=priority_next and not priority_by_amount,
+                            priority_by_amount=priority_by_amount,
                             db=db,
                         )
                     if not youtube_result.get("success"):
@@ -493,6 +540,15 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
             from utils.websocket_helper import broadcast_drops_event
             await broadcast_drops_event(result)
             response_payload = {'success': True, 'message': 'Drops processed.', 'data': result}
+            response_payload['donation_event'] = {
+                'provider': donation_event.provider,
+                'event_id': donation_event.event_id,
+                'amount_original': donation_event.amount_original,
+                'currency_original': donation_event.currency_original,
+                'amount_rub': donation_event.amount_rub,
+                'rate_source': donation_event.rate_source,
+                'rate_timestamp': donation_event.rate_timestamp.isoformat(),
+            }
             if memealerts_result and memealerts_result.get('handled'):
                 response_payload['memealerts'] = memealerts_result
             if youtube_result:
@@ -500,6 +556,15 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
             return response_payload
         else:
             response_payload = {'success': True, 'processed': False, 'message': 'No matching drops result was produced.'}
+            response_payload['donation_event'] = {
+                'provider': donation_event.provider,
+                'event_id': donation_event.event_id,
+                'amount_original': donation_event.amount_original,
+                'currency_original': donation_event.currency_original,
+                'amount_rub': donation_event.amount_rub,
+                'rate_source': donation_event.rate_source,
+                'rate_timestamp': donation_event.rate_timestamp.isoformat(),
+            }
             if memealerts_result and memealerts_result.get('handled'):
                 response_payload['memealerts'] = memealerts_result
             if youtube_result:

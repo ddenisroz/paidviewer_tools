@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,7 +17,7 @@ vi.mock('@/services/api/services/dropsService', () => ({
 
 describe('DropsWidget preview mode', () => {
     beforeEach(() => {
-        vi.useFakeTimers();
+        vi.clearAllMocks();
         vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
         vi.stubGlobal('cancelAnimationFrame', vi.fn());
         dropsServiceMock.getUserFromToken.mockResolvedValue({
@@ -55,15 +55,13 @@ describe('DropsWidget preview mode', () => {
     });
 
     afterEach(() => {
-        vi.runOnlyPendingTimers();
-        vi.useRealTimers();
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
     });
 
-    it('leaves idle state and starts the roulette in preview mode', async () => {
+    it('keeps dashboard preview idle until a run is requested', async () => {
         const { container, unmount } = render(
-            <MemoryRouter initialEntries={['/drops-widget/test-token?preview=true&quality=common']}>
+            <MemoryRouter initialEntries={['/drops-widget/test-token?preview=true&background=green']}>
                 <Routes>
                     <Route path="/drops-widget/:token" element={<DropsWidget />} />
                 </Routes>
@@ -72,12 +70,32 @@ describe('DropsWidget preview mode', () => {
 
         expect(container.firstElementChild).toHaveAttribute('data-drops-phase', 'idle');
 
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(450);
+        await waitFor(() => {
+            expect(dropsServiceMock.getUserFromToken).toHaveBeenCalled();
         });
 
-        await act(async () => {
-            await Promise.resolve();
+        expect(container.firstElementChild).toHaveAttribute('data-drops-phase', 'idle');
+
+        act(() => {
+            unmount();
+        });
+    });
+
+    it('leaves idle state and starts the roulette when preview run is requested', async () => {
+        const { container, unmount } = render(
+            <MemoryRouter initialEntries={['/drops-widget/test-token?preview=true&quality=common&run=1']}>
+                <Routes>
+                    <Route path="/drops-widget/:token" element={<DropsWidget />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        expect(container.firstElementChild).toHaveAttribute('data-drops-phase', 'idle');
+
+        await waitFor(() => {
+            expect(container.firstElementChild).not.toHaveAttribute('data-drops-phase', 'idle');
+        }, {
+            timeout: 1500,
         });
 
         expect(container.firstElementChild).not.toHaveAttribute('data-drops-phase', 'idle');

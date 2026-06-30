@@ -29,7 +29,6 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -38,6 +37,7 @@ import { resolveAudioUrl } from '@/shared/utils/urlUtils';
 import type { TtsVoice } from '@/types/tts';
 
 type SpeedPreset = 'very_slow' | 'slow' | 'normal' | 'fast' | 'very_fast';
+const SPEED_PRESET_ORDER: SpeedPreset[] = ['very_slow', 'slow', 'normal', 'fast', 'very_fast'];
 
 interface EnabledVoicesPayload {
     enabled_voice_ids?: number[];
@@ -76,6 +76,15 @@ const getVoiceSpeed = (voice: TtsVoice): SpeedPreset =>
     (voice.user_settings?.speed_preset || voice.speed_preset || 'normal') as SpeedPreset;
 
 const getVoiceCfg = (voice: TtsVoice): number => Number(voice.user_settings?.cfg_strength ?? voice.cfg_strength ?? 2.5);
+const getSpeedPresetIndex = (speed: SpeedPreset): number => Math.max(0, SPEED_PRESET_ORDER.indexOf(speed));
+const getSpeedPresetByIndex = (index: number): SpeedPreset =>
+    SPEED_PRESET_ORDER[Math.max(0, Math.min(SPEED_PRESET_ORDER.length - 1, Math.round(index)))] || 'normal';
+const serializeVoiceSettings = (cfg: number, speed: SpeedPreset, text: string): string =>
+    JSON.stringify({
+        cfg: Number(cfg.toFixed(1)),
+        speed,
+        text: text.trim(),
+    });
 
 const VoiceCard: React.FC<{
     voice: TtsVoice;
@@ -206,6 +215,8 @@ const VoiceManagementPage: React.FC = () => {
     const userId = user?.id;
     const queryClient = useQueryClient();
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const settingsSaveTimeoutRef = useRef<number | null>(null);
+    const savedSettingsRef = useRef('');
 
     const [uploadOpen, setUploadOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -266,6 +277,9 @@ const VoiceManagementPage: React.FC = () => {
                 audioRef.current.pause();
                 audioRef.current.src = '';
             }
+            if (settingsSaveTimeoutRef.current !== null) {
+                window.clearTimeout(settingsSaveTimeoutRef.current);
+            }
         };
     }, []);
 
@@ -279,10 +293,14 @@ const VoiceManagementPage: React.FC = () => {
     const uploadNameError = uploadNameTouched && !trimmedVoiceName;
 
     const openVoiceSettings = (voice: TtsVoice): void => {
+        const cfg = getVoiceCfg(voice);
+        const speed = getVoiceSpeed(voice);
+        const text = voice.reference_text || DEFAULT_PREVIEW_TEXT;
         setSelectedVoice(voice);
-        setSettingsCfg(getVoiceCfg(voice));
-        setSettingsSpeed(getVoiceSpeed(voice));
-        setPreviewText(voice.reference_text || DEFAULT_PREVIEW_TEXT);
+        setSettingsCfg(cfg);
+        setSettingsSpeed(speed);
+        setPreviewText(text);
+        savedSettingsRef.current = serializeVoiceSettings(cfg, speed, text);
         setSettingsOpen(true);
     };
 
@@ -374,28 +392,58 @@ const VoiceManagementPage: React.FC = () => {
     });
 
     const saveSettingsMutation = useMutation({
-        mutationFn: async () => {
-            if (!userId || !selectedVoice) throw new Error('Голос не выбран.');
+        mutationFn: async (payload: {
+            voiceId: number;
+            cfgStrength: number;
+            speedPreset: SpeedPreset;
+            referenceText: string;
+        }) => {
+            if (!userId) throw new Error('Голос не выбран.');
             return updateUserVoiceSettings(
-                selectedVoice.id,
+                payload.voiceId,
                 userId,
                 {
-                    cfg_strength: settingsCfg,
-                    speed_preset: settingsSpeed,
-                    reference_text: previewText.trim() || undefined,
+                    cfg_strength: payload.cfgStrength,
+                    speed_preset: payload.speedPreset,
+                    reference_text: payload.referenceText.trim() || undefined,
                 },
                 'f5'
             );
         },
-        onSuccess: async () => {
+        onSuccess: async (_response, variables) => {
+            savedSettingsRef.current = serializeVoiceSettings(
+                variables.cfgStrength,
+                variables.speedPreset,
+                variables.referenceText
+            );
             await Promise.all([refetchGlobalVoices(), refetchUserVoices(), refetchEnabledVoices()]);
-            setSettingsOpen(false);
-            toast.success('Настройки сохранены');
         },
         onError: (error) => {
             toast.error(error instanceof Error ? error.message : 'Не удалось сохранить настройки');
         },
     });
+
+    const saveVoiceSettings = (nextCfg: number, nextSpeed: SpeedPreset, nextText: string): void => {
+        if (!selectedVoice || !userId) return;
+        const serialized = serializeVoiceSettings(nextCfg, nextSpeed, nextText);
+        if (serialized === savedSettingsRef.current || saveSettingsMutation.isPending) return;
+        saveSettingsMutation.mutate({
+            voiceId: selectedVoice.id,
+            cfgStrength: nextCfg,
+            speedPreset: nextSpeed,
+            referenceText: nextText,
+        });
+    };
+
+    const scheduleVoiceSettingsSave = (nextCfg: number, nextSpeed: SpeedPreset, nextText: string, delayMs = 450): void => {
+        if (settingsSaveTimeoutRef.current !== null) {
+            window.clearTimeout(settingsSaveTimeoutRef.current);
+        }
+        settingsSaveTimeoutRef.current = window.setTimeout(() => {
+            saveVoiceSettings(nextCfg, nextSpeed, nextText);
+            settingsSaveTimeoutRef.current = null;
+        }, delayMs);
+    };
 
     const isMutating =
         uploadVoiceMutation.isPending ||
@@ -546,34 +594,46 @@ const VoiceManagementPage: React.FC = () => {
                                 max={5}
                                 step={0.1}
                                 onValueChange={(value) => setSettingsCfg(value[0] ?? 2.5)}
+                                onValueCommit={(value) => {
+                                    const nextCfg = value[0] ?? 2.5;
+                                    setSettingsCfg(nextCfg);
+                                    saveVoiceSettings(nextCfg, settingsSpeed, previewText);
+                                }}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>Скорость</Label>
-                            <Select value={settingsSpeed} onValueChange={(value) => setSettingsSpeed(value as SpeedPreset)}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Object.entries(SPEED_LABELS).map(([value, label]) => (
-                                        <SelectItem key={value} value={value}>
-                                            {label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <div className="flex items-center justify-between">
+                                <Label>Скорость</Label>
+                                <span className="text-sm font-bold text-foreground">{SPEED_LABELS[settingsSpeed]}</span>
+                            </div>
+                            <Slider
+                                value={[getSpeedPresetIndex(settingsSpeed)]}
+                                min={0}
+                                max={SPEED_PRESET_ORDER.length - 1}
+                                step={1}
+                                onValueChange={(value) => setSettingsSpeed(getSpeedPresetByIndex(value[0] ?? 2))}
+                                onValueCommit={(value) => {
+                                    const nextSpeed = getSpeedPresetByIndex(value[0] ?? 2);
+                                    setSettingsSpeed(nextSpeed);
+                                    saveVoiceSettings(settingsCfg, nextSpeed, previewText);
+                                }}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="voice-preview-text">Текст прослушки</Label>
                             <Textarea
                                 id="voice-preview-text"
                                 value={previewText}
-                                onChange={(event) => setPreviewText(event.target.value)}
+                                onChange={(event) => {
+                                    const nextText = event.target.value;
+                                    setPreviewText(nextText);
+                                    scheduleVoiceSettingsSave(settingsCfg, settingsSpeed, nextText);
+                                }}
                                 className="min-h-20"
                             />
                         </div>
                     </div>
-                    <DialogFooter className={cn('gap-2 sm:justify-between')}>
+                    <div className={cn('flex items-center justify-between gap-3 pt-2')}>
                         <Button
                             type="button"
                             variant="outline"
@@ -584,19 +644,10 @@ const VoiceManagementPage: React.FC = () => {
                             <Play className="h-4 w-4" />
                             Прослушать
                         </Button>
-                        <div className="flex gap-2">
-                            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>
-                                Отмена
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={() => saveSettingsMutation.mutate()}
-                                disabled={!selectedVoice || saveSettingsMutation.isPending}
-                            >
-                                Сохранить
-                            </Button>
-                        </div>
-                    </DialogFooter>
+                        <span className="text-xs text-muted-foreground">
+                            {saveSettingsMutation.isPending ? 'Сохраняем…' : 'Сохранение автоматически'}
+                        </span>
+                    </div>
                 </DialogContent>
             </Dialog>
         </PageWrapper>

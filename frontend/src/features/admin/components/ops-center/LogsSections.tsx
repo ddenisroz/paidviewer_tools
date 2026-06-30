@@ -7,6 +7,7 @@ import { logStatusBadgeClass } from '@/features/admin/types/adminReadModels';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { formatAppDateTime } from '@/shared/utils/dateTime';
 
 import AdminMetricCard from './AdminMetricCard';
 
@@ -111,7 +112,7 @@ export const LogsContent: React.FC<{ data: LogsOverviewPayload; isLoading: boole
                                           <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                                               <Clock className="h-3 w-3" />
                                               {log.timestamp
-                                                  ? new Date(log.timestamp).toLocaleString('ru-RU')
+                                                  ? formatAppDateTime(log.timestamp)
                                                   : 'время неизвестно'}
                                           </p>
                                           {log.error_message ? (

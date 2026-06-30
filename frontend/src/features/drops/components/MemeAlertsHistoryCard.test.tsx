@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemeAlertsHistoryCard } from './MemeAlertsHistoryCard';
 
 describe('MemeAlertsHistoryCard', () => {
-    it('hides numeric manual labels in history rows', () => {
+    it('hides numeric manual labels and shows transaction amount in history rows', () => {
         render(
             <MemeAlertsHistoryCard
                 historyRows={[
@@ -28,6 +28,7 @@ describe('MemeAlertsHistoryCard', () => {
         );
 
         expect(screen.getByText('MemeAlerts: Yourchy')).toBeInTheDocument();
+        expect(screen.getByText('+1')).toBeInTheDocument();
         expect(screen.queryByText(/^1$/)).not.toBeInTheDocument();
     });
 });

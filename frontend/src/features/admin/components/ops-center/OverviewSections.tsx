@@ -29,7 +29,7 @@ export const OverviewStatsGrid: React.FC<{ data: OverviewPayload }> = ({ data })
                 icon={Layers3}
             />
             <AdminMetricCard
-                title="Локальный TTS"
+                title="Self Hosted TTS"
                 value={stats.totalWorkers}
                 caption={`${stats.onlineWorkers} работают, ${stats.offlineWorkers} не отвечают`}
                 icon={Bot}

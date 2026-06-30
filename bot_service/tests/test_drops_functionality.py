@@ -22,6 +22,7 @@ from core.database import (
     UserStreak,
     DropsHistory,
     MythicalDropsSession,
+    PendingStreakChest,
 )
 from services.drops.drops_service import DropsService
 from services.drops.drops_calculation_service import DropsCalculationService
@@ -326,7 +327,7 @@ class TestStreakTracking:
         )
 
     def test_streak_progression_uses_previous_stream_session(
-        self, drops_service, test_config, test_rewards
+        self, drops_service, test_config, test_rewards, db_session
     ):
         """Streak progression should be computed across stream_session boundaries."""
         drops_service._check_stream_online = lambda **kwargs: True
@@ -375,7 +376,7 @@ class TestStreakTracking:
 
         assert first_session.id != second_session.id
         assert result is not None
-        assert result["type"] == "streak"
+        assert result["type"] == "streak_pending"
         assert result["streak_days"] == 1
         assert result["stream_session_id"] == second_session.id
         assert result["source_event_id"] == "chat_message:101"
@@ -389,15 +390,76 @@ class TestStreakTracking:
         assert streak.current_streak == 1
         assert streak.last_stream_session_id == second_session.id
 
-        history = drops_service.get_drops_history(
+        pending = db_session.query(PendingStreakChest).filter_by(
             user_id=1,
             channel_name="test_channel",
             platform="twitch",
-            limit=10,
-        )
-        assert history[0].stream_session_id == second_session.id
-        assert history[0].source_event_id == "chat_message:101"
+            viewer_id="viewer123",
+            status="pending",
+        ).first()
+        assert pending is not None
+        assert pending.stream_session_id == second_session.id
+        assert pending.source_event_id == "chat_message:101"
         print("[OK] Streak progression uses previous stream session boundaries")
+
+    def test_pending_streak_chest_upgrades_instead_of_duplicate(
+        self, drops_service, test_config, db_session
+    ):
+        """A viewer keeps one pending streak chest that upgrades by quality."""
+        drops_service._check_stream_online = lambda **kwargs: True
+        test_config.streak_days_common = 7
+        test_config.streak_days_rare = 7
+        test_config.streak_days_epic = 7
+        test_config.streak_days_legendary = 14
+        db_session.commit()
+
+        streak = UserStreak(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+            current_streak=6,
+            max_streak=6,
+            messages_this_stream=test_config.streak_messages_required,
+        )
+        db_session.add(streak)
+        db_session.commit()
+
+        epic_result = drops_service.process_streak_drops(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+            source_event_id="event-7",
+        )
+
+        assert epic_result is not None
+        assert epic_result["quality"] == "Epic"
+        assert db_session.query(PendingStreakChest).filter_by(status="pending").count() == 1
+
+        streak.current_streak = 13
+        streak.max_streak = 13
+        streak.last_stream_session_id = None
+        streak.messages_this_stream = test_config.streak_messages_required
+        db_session.commit()
+
+        legendary_result = drops_service.process_streak_drops(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+            source_event_id="event-14",
+        )
+
+        pending = db_session.query(PendingStreakChest).filter_by(status="pending").one()
+        assert legendary_result is not None
+        assert legendary_result["quality"] == "Legendary"
+        assert legendary_result["pending_chest_id"] == epic_result["pending_chest_id"]
+        assert pending.quality_name == "Legendary"
+        assert pending.streak_days == 14
 
 
 class TestDonationDrops:

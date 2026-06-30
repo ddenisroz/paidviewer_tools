@@ -125,6 +125,7 @@ class DropsConfigMixin:
                 widget_result_duration_ms=getattr(base_config, "widget_result_duration_ms", 5500),
                 widget_closing_duration_ms=getattr(base_config, "widget_closing_duration_ms", 500),
                 widget_spin_sound_file=getattr(base_config, "widget_spin_sound_file", None),
+                widget_start_sound_file=getattr(base_config, "widget_start_sound_file", None),
                 widget_reveal_sound_file=getattr(base_config, "widget_reveal_sound_file", None),
                 widget_sound_volume=getattr(base_config, "widget_sound_volume", 1.0),
                 widget_token=getattr(base_config, "widget_token", None),
@@ -316,6 +317,7 @@ class DropsConfigMixin:
                 widget_result_duration_ms=getattr(base_config, 'widget_result_duration_ms', 5500),
                 widget_closing_duration_ms=getattr(base_config, 'widget_closing_duration_ms', 500),
                 widget_spin_sound_file=getattr(base_config, 'widget_spin_sound_file', None),
+                widget_start_sound_file=getattr(base_config, 'widget_start_sound_file', None),
                 widget_reveal_sound_file=getattr(base_config, 'widget_reveal_sound_file', None),
                 widget_sound_volume=getattr(base_config, 'widget_sound_volume', 1.0),
                 widget_token=getattr(base_config, 'widget_token', None)

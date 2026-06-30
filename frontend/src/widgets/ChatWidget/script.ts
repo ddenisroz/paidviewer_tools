@@ -39,6 +39,23 @@ interface ChatMessage {
     platform: Platform;
 }
 
+const resolveWidgetTimeZone = (): string => {
+    try {
+        return window.localStorage.getItem('app.timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    } catch {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    }
+};
+
+const formatWidgetTime = (value: Date): string =>
+    new Intl.DateTimeFormat('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone: resolveWidgetTimeZone(),
+    }).format(value);
+
 class ChatWidget {
     private config: ChatConfig | null;
     private ws: WebSocket | null;
@@ -326,7 +343,7 @@ class ChatWidget {
         if (this.config?.showTimestamps) {
             const timeElement = document.createElement('span');
             timeElement.className = 'timestamp';
-            timeElement.textContent = ` [${message.timestamp.toLocaleTimeString()}]`;
+            timeElement.textContent = ` [${formatWidgetTime(message.timestamp)}]`;
             messageElement.appendChild(timeElement);
         }
         messagesContainer.appendChild(messageElement);

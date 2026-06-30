@@ -25,6 +25,7 @@ interface MessageContentProps {
     showLinks?: boolean;
     autoLoadImages?: boolean;
     imageLoading?: 'lazy' | 'eager';
+    onMediaLoad?: () => void;
 }
 
 // Regex для URL - создаем один раз
@@ -102,13 +103,15 @@ const TWITCH_TEXT_EMOTES: Record<string, { id: string; name: string }> = {
 };
 
 // Компонент для изображения с fallback на ссылку
-const ChatImage: React.FC<{ src: string; loading?: 'lazy' | 'eager' }> = memo(({ src, loading = 'lazy' }) => (
-    <span className="inline-block my-1">
+const ChatImage: React.FC<{ src: string; loading?: 'lazy' | 'eager'; onLoad?: () => void }> = memo(
+    ({ src, loading = 'lazy', onLoad }) => (
+        <span className="chat-media-attachment my-1 inline-block align-top">
         <img
             src={src}
             alt="Изображение"
             loading={loading}
-            className="max-w-[min(200px,45vw)] max-h-[min(200px,45vw)] rounded"
+            className="max-h-[min(360px,70vh)] max-w-[min(320px,72vw)] rounded object-contain align-top"
+            onLoad={onLoad}
             onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
@@ -119,10 +122,12 @@ const ChatImage: React.FC<{ src: string; loading?: 'lazy' | 'eager' }> = memo(({
                 link.className = 'text-cyan-400 underline';
                 link.textContent = src;
                 target.parentNode?.appendChild(link);
+                onLoad?.();
             }}
         />
     </span>
-));
+    )
+);
 ChatImage.displayName = 'ChatImage';
 
 // Компонент для ссылки
@@ -184,7 +189,8 @@ const renderPart = (
     index: number,
     showLinks: boolean,
     autoLoadImages: boolean,
-    imageLoading: 'lazy' | 'eager'
+    imageLoading: 'lazy' | 'eager',
+    onMediaLoad?: () => void
 ): React.ReactNode => {
     const sanitizedPart = sanitizeTextContent(part);
     const normalizedUrl = normalizeRenderableUrl(part);
@@ -196,7 +202,7 @@ const renderPart = (
         }
 
         if (autoLoadImages && isImageUrl(normalizedUrl)) {
-            return <ChatImage key={index} src={normalizedUrl} loading={imageLoading} />;
+            return <ChatImage key={index} src={normalizedUrl} loading={imageLoading} onLoad={onMediaLoad} />;
         }
 
         return <ChatLink key={index} href={normalizedUrl} />;
@@ -210,7 +216,8 @@ const renderMessageWithEmotes = (
     processedMessage: string,
     showLinks: boolean,
     autoLoadImages: boolean,
-    imageLoading: 'lazy' | 'eager'
+    imageLoading: 'lazy' | 'eager',
+    onMediaLoad?: () => void
 ): React.ReactNode[] => {
     // Разбиваем по тегам img
     const parts = processedMessage.split(/(<img[^>]*\/>)/);
@@ -242,6 +249,7 @@ const renderMessageWithEmotes = (
                             marginInline: '0.1em',
                         }}
                         loading={imageLoading}
+                        onLoad={onMediaLoad}
                         onError={(e) => {
                             const target = e.currentTarget;
                             if (tryVkAssetFallback(target)) return;
@@ -249,6 +257,7 @@ const renderMessageWithEmotes = (
                             fallback.textContent = '';
                             fallback.className = 'text-xs opacity-80';
                             target.replaceWith(fallback);
+                            onMediaLoad?.();
                         }}
                     />
                 );
@@ -269,7 +278,14 @@ const renderMessageWithEmotes = (
             // Упрощение: если часть - это чистый URL
             if (/^https?:\/\/\S+$/i.test(normalizedPartUrl)) {
                 if (autoLoadImages && isImageUrl(normalizedPartUrl)) {
-                    return <ChatImage key={index} src={normalizedPartUrl} loading={imageLoading} />;
+                    return (
+                        <ChatImage
+                            key={index}
+                            src={normalizedPartUrl}
+                            loading={imageLoading}
+                            onLoad={onMediaLoad}
+                        />
+                    );
                 }
                 return <ChatLink key={index} href={normalizedPartUrl} />;
             }
@@ -286,6 +302,7 @@ const renderMessageWithEmotes = (
                                 key={`${index}-${subIndex}`}
                                 src={normalizedSubPartUrl}
                                 loading={imageLoading}
+                                onLoad={onMediaLoad}
                             />
                         );
                     return <ChatLink key={`${index}-${subIndex}`} href={normalizedSubPartUrl} />;
@@ -310,6 +327,7 @@ const MessageContent: React.FC<MessageContentProps> = memo(
         showLinks = true,
         autoLoadImages = true,
         imageLoading = 'lazy',
+        onMediaLoad,
     }) => {
         // Мемоизация обработки сообщения
         const content = useMemo(() => {
@@ -333,8 +351,8 @@ const MessageContent: React.FC<MessageContentProps> = memo(
             // Если есть эмодзи (img теги) - используем специальный рендерер
             if (withEmotes.includes('<img')) {
                 return (
-                    <span className="chat-message-content break-words">
-                        {renderMessageWithEmotes(withEmotes, showLinks, autoLoadImages, imageLoading)}
+                    <span className="chat-message-content break-words align-top">
+                        {renderMessageWithEmotes(withEmotes, showLinks, autoLoadImages, imageLoading, onMediaLoad)}
                     </span>
                 );
             }
@@ -348,16 +366,16 @@ const MessageContent: React.FC<MessageContentProps> = memo(
             // Разбиваем на части и рендерим
             const parts = message.split(URL_REGEX);
             return (
-                <span className="chat-message-content break-words">
+                <span className="chat-message-content break-words align-top">
                     {parts.map((part, index) => (
                         <span key={index} className="align-middle">
-                            {renderPart(part, index, showLinks, autoLoadImages, imageLoading)}
+                            {renderPart(part, index, showLinks, autoLoadImages, imageLoading, onMediaLoad)}
                             {index < parts.length - 1 && sanitizeTextContent(part) ? ' ' : ''}
                         </span>
                     ))}
                 </span>
             );
-        }, [message, channelEmotes, globalEmotes, twitchEmotes, showLinks, autoLoadImages, imageLoading]);
+        }, [message, channelEmotes, globalEmotes, twitchEmotes, showLinks, autoLoadImages, imageLoading, onMediaLoad]);
 
         return content;
     }

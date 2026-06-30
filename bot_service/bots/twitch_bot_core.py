@@ -1,5 +1,5 @@
-# bot_service/bots/twitch_bot_core.py
-"""Основной класс Twitch бота"""
+﻿# bot_service/bots/twitch_bot_core.py
+"""РћСЃРЅРѕРІРЅРѕР№ РєР»Р°СЃСЃ Twitch Р±РѕС‚Р°"""
 import asyncio
 import logging
 from typing import List, Optional
@@ -8,7 +8,7 @@ from core.connection_manager import ConnectionManager
 from services.tts.tts_core import TTSAPI
 from services.youtube.youtube_service import YouTubeService
 
-# Настройка логирования для TwitchIO
+# РќР°СЃС‚СЂРѕР№РєР° Р»РѕРіРёСЂРѕРІР°РЅРёСЏ РґР»СЏ TwitchIO
 logging.getLogger('twitchio').setLevel(logging.INFO)
 logging.getLogger('twitchio.websocket').setLevel(logging.INFO)
 logging.getLogger('twitchio.client').setLevel(logging.INFO)
@@ -16,7 +16,7 @@ logging.getLogger('twitchio.client').setLevel(logging.INFO)
 logger = logging.getLogger('bot_service')
 
 class TwitchBotCore(commands.Bot):
-    """Основной класс Twitch бота"""
+    """РћСЃРЅРѕРІРЅРѕР№ РєР»Р°СЃСЃ Twitch Р±РѕС‚Р°"""
 
     def __init__(self, token: str, initial_channels: List[str], connection_manager: ConnectionManager):
         logger.info("[BOT] CREATING TWITCH BOT")
@@ -45,7 +45,7 @@ class TwitchBotCore(commands.Bot):
         logger.info(f"[DEBUG] Bot user_id: {getattr(self, 'user_id', 'NOT SET')}")
 
     async def event_ready(self):
-        """Вызывается когда бот готов к работе"""
+        """Р’С‹Р·С‹РІР°РµС‚СЃСЏ РєРѕРіРґР° Р±РѕС‚ РіРѕС‚РѕРІ Рє СЂР°Р±РѕС‚Рµ"""
         logger.info('=' * 80)
         logger.info('[BOT] TWITCH BOT READY!')
         logger.info('=' * 80)
@@ -62,27 +62,27 @@ class TwitchBotCore(commands.Bot):
         logger.info('=' * 80)
 
     async def event_message(self, message):
-        """Обработка входящих сообщений"""
-        # Пропускаем сообщения бота
+        """РћР±СЂР°Р±РѕС‚РєР° РІС…РѕРґСЏС‰РёС… СЃРѕРѕР±С‰РµРЅРёР№"""
+        # РџСЂРѕРїСѓСЃРєР°РµРј СЃРѕРѕР±С‰РµРЅРёСЏ Р±РѕС‚Р°
         if message.echo:
             logger.debug(f"[SKIP] Bot message: {message.content}")
             return
 
 
-        # Логируем сообщение
+        # Р›РѕРіРёСЂСѓРµРј СЃРѕРѕР±С‰РµРЅРёРµ
         logger.info(f'[CHAT] [TWITCH CHAT] {message.channel.name}: {message.author.name}: {message.content}')
 
-        # Отправляем сообщение в chatbox через WebSocket
+        # РћС‚РїСЂР°РІР»СЏРµРј СЃРѕРѕР±С‰РµРЅРёРµ РІ chatbox С‡РµСЂРµР· WebSocket
         try:
             from utils.websocket_helper import broadcast_chat_message
 
-            # Парсим роли и значки из Twitch tags
+            # РџР°СЂСЃРёРј СЂРѕР»Рё Рё Р·РЅР°С‡РєРё РёР· Twitch tags
             role = None
             badges_list = []
             emotes_list = []
             source_message_id = None
 
-            # Проверяем роль (broadcaster > moderator > vip > subscriber)
+            # РџСЂРѕРІРµСЂСЏРµРј СЂРѕР»СЊ (broadcaster > moderator > vip > subscriber)
             if message.author.is_broadcaster:
                 role = 'broadcaster'
             elif message.author.is_mod:
@@ -92,11 +92,11 @@ class TwitchBotCore(commands.Bot):
             elif message.author.is_subscriber:
                 role = 'subscriber'
 
-            # Парсим badges из tags (если доступны)
+            # РџР°СЂСЃРёРј badges РёР· tags (РµСЃР»Рё РґРѕСЃС‚СѓРїРЅС‹)
             if hasattr(message, 'tags') and message.tags:
                 source_message_id = str(message.tags.get("id") or "").strip() or None
                 if 'badges' in message.tags:
-                    # Формат: "broadcaster/1,subscriber/12"
+                    # Р¤РѕСЂРјР°С‚: "broadcaster/1,subscriber/12"
                     badges_str = message.tags.get('badges', '')
                     logger.debug("[BADGES RAW] %s: %r", message.author.name, badges_str)
                     if badges_str:
@@ -109,7 +109,7 @@ class TwitchBotCore(commands.Bot):
 
             logger.debug(f"[ROLE] {message.author.name}: role={role}, badges={badges_list}")
 
-            # Отправляем в chatbox
+            # РћС‚РїСЂР°РІР»СЏРµРј РІ chatbox
             avatar_url = getattr(message.author, 'profile_image', None) or getattr(message.author, 'profile_image_url', None)
             await broadcast_chat_message(
                 username=message.author.name,
@@ -123,13 +123,13 @@ class TwitchBotCore(commands.Bot):
                 avatar_url=avatar_url
             )
 
-            # [OK] НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
+            # [OK] РќРћР’РћР•: РЈРІРµР»РёС‡РёРІР°РµРј СЃС‡РµС‚С‡РёРє СЃРѕРѕР±С‰РµРЅРёР№ РґР»СЏ СЃС‚СЂРёРєРѕРІ (С‚РѕР»СЊРєРѕ РµСЃР»Рё СЃС‚СЂРёРє РІРєР»СЋС‡РµРЅ)
             try:
                 from services.drops.drops_service import DropsService
                 from core.database import get_db
                 from repositories.user_repository import UserRepository
 
-                # Ищем user_id владельца канала по имени канала
+                # РС‰РµРј user_id РІР»Р°РґРµР»СЊС†Р° РєР°РЅР°Р»Р° РїРѕ РёРјРµРЅРё РєР°РЅР°Р»Р°
                 db = next(get_db())
                 try:
                     user_repo = UserRepository(db)
@@ -137,20 +137,20 @@ class TwitchBotCore(commands.Bot):
 
                     if channel_owner:
                         drops_service = DropsService(db)
-                        # [OK] Проверяем включен ли стрик для Twitch
+                        # [OK] РџСЂРѕРІРµСЂСЏРµРј РІРєР»СЋС‡РµРЅ Р»Рё СЃС‚СЂРёРє РґР»СЏ Twitch
                         config = drops_service.get_config(
                             user_id=channel_owner.id,
                             session_id=None,
                             channel_name=message.channel.name.lower(),
-                            platform=None  # Общий конфиг
+                            platform=None  # РћР±С‰РёР№ РєРѕРЅС„РёРі
                         )
 
-                        # Проверяем включен ли стрик для Twitch
+                        # РџСЂРѕРІРµСЂСЏРµРј РІРєР»СЋС‡РµРЅ Р»Рё СЃС‚СЂРёРє РґР»СЏ Twitch
                         streak_enabled = False
                         if config:
                             streak_enabled = getattr(config, 'streak_enabled_twitch', False)
 
-                        # Увеличиваем счетчик только если стрик включен
+                        # РЈРІРµР»РёС‡РёРІР°РµРј СЃС‡РµС‚С‡РёРє С‚РѕР»СЊРєРѕ РµСЃР»Рё СЃС‚СЂРёРє РІРєР»СЋС‡РµРЅ
                         if streak_enabled:
                             drops_service.increment_viewer_message_count(
                                 user_id=channel_owner.id,
@@ -169,11 +169,7 @@ class TwitchBotCore(commands.Bot):
                                     source_event_id=source_message_id,
                                 )
                                 if result:
-                                    logger.info(
-                                        f"[REWARD] [DROPS TWITCH] {result['viewer_name']} получил {result['reward']} ({result['quality']})"
-                                    )
-                                    from utils.websocket_helper import broadcast_drops_event
-                                    await broadcast_drops_event(result)
+                                    logger.info("[DROPS TWITCH] %s pending streak chest: %s", result.get("viewer_name"), result.get("quality"))
                             except Exception as drops_err:
                                 logger.debug(f"Could not process streak drops for Twitch: {drops_err}")
                 finally:
@@ -181,15 +177,15 @@ class TwitchBotCore(commands.Bot):
             except Exception as streak_err:
                 logger.debug(f"Could not increment streak message count: {streak_err}")
 
-            # NOTE: TTS обрабатывается в twitch_bot.py::_handle_tts()
-            # Не дублируем вызов здесь!
+            # NOTE: TTS РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚СЃСЏ РІ twitch_bot.py::_handle_tts()
+            # РќРµ РґСѓР±Р»РёСЂСѓРµРј РІС‹Р·РѕРІ Р·РґРµСЃСЊ!
 
         except Exception as e:
             logger.error(f'[ERROR] [ERROR] Failed to process chat message: {e}')
             import traceback
             logger.error(traceback.format_exc())
 
-        # Обрабатываем команды
+        # РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РєРѕРјР°РЅРґС‹
         await self.handle_commands(message)
 
     @staticmethod
@@ -227,19 +223,19 @@ class TwitchBotCore(commands.Bot):
         return parsed
 
     async def event_channel_joined(self, channel):
-        """Вызывается при подключении к каналу"""
+        """Р’С‹Р·С‹РІР°РµС‚СЃСЏ РїСЂРё РїРѕРґРєР»СЋС‡РµРЅРёРё Рє РєР°РЅР°Р»Сѓ"""
         logger.info(f'[JOIN] Joined channel: {channel.name}')
 
     async def event_channel_left(self, channel):
-        """Вызывается при отключении от канала"""
+        """Р’С‹Р·С‹РІР°РµС‚СЃСЏ РїСЂРё РѕС‚РєР»СЋС‡РµРЅРёРё РѕС‚ РєР°РЅР°Р»Р°"""
         logger.info(f'[LEFT] Left channel: {channel.name}')
 
     async def event_error(self, error):
-        """Обработка ошибок"""
+        """РћР±СЂР°Р±РѕС‚РєР° РѕС€РёР±РѕРє"""
         logger.error(f'[ERROR] Twitch bot error: {error}')
 
     def get_channel_info(self, channel_name: str) -> Optional[dict]:
-        """Получить информацию о канале"""
+        """РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РєР°РЅР°Р»Рµ"""
         for channel in self.connected_channels:
             if channel.name.lower() == channel_name.lower():
                 return {
@@ -250,12 +246,12 @@ class TwitchBotCore(commands.Bot):
         return None
 
     def is_connected_to_channel(self, channel_name: str) -> bool:
-        """Проверить подключение к каналу"""
+        """РџСЂРѕРІРµСЂРёС‚СЊ РїРѕРґРєР»СЋС‡РµРЅРёРµ Рє РєР°РЅР°Р»Сѓ"""
         return any(channel.name.lower() == channel_name.lower()
                   for channel in self.connected_channels)
 
     async def join_channel(self, channel_name: str):
-        """Подключиться к каналу"""
+        """РџРѕРґРєР»СЋС‡РёС‚СЊСЃСЏ Рє РєР°РЅР°Р»Сѓ"""
         try:
             await self.join_channels([channel_name])
             logger.info(f'[JOIN] Joined channel: {channel_name}')
@@ -265,7 +261,7 @@ class TwitchBotCore(commands.Bot):
             return False
 
     async def leave_channel(self, channel_name: str):
-        """Отключиться от канала"""
+        """РћС‚РєР»СЋС‡РёС‚СЊСЃСЏ РѕС‚ РєР°РЅР°Р»Р°"""
         try:
             await self.part_channels([channel_name])
             logger.info(f'[LEFT] Left channel: {channel_name}')
@@ -275,5 +271,5 @@ class TwitchBotCore(commands.Bot):
             return False
 
     def get_connected_channels_list(self) -> List[str]:
-        """Получить список подключенных каналов"""
+        """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїРѕРґРєР»СЋС‡РµРЅРЅС‹С… РєР°РЅР°Р»РѕРІ"""
         return [channel.name for channel in self.connected_channels]

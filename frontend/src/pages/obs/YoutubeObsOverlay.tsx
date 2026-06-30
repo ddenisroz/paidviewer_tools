@@ -35,17 +35,17 @@ const VideoInfoPanel: React.FC<{
                     <span className="text-white/35">YouTube</span>
                     {video.is_paid || video.paid_source ? (
                         <span className="rounded bg-amber-400/14 px-1.5 py-0.5 text-[10px] font-black text-amber-200">
-                            Paid video
+                            Платные заказы
                         </span>
                     ) : null}
                 </div>
                 <div className="truncate text-lg font-semibold leading-tight">{video.title}</div>
                 <div className="mt-1 truncate text-sm text-white/65">
-                    {video.requester_name ? `Requested by: ${video.requester_name}` : 'Current video'}
+                    {video.requester_name ? `Заказал: ${video.requester_name}` : 'Текущий трек'}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-3 text-xs font-semibold text-white/50">
-                    {formatDuration(video.duration) ? <span>Length: {formatDuration(video.duration)}</span> : null}
-                    {skipVotes ? <span>Skip: {skipVotes.current}/{skipVotes.required}</span> : null}
+                    {formatDuration(video.duration) ? <span>Длительность: {formatDuration(video.duration)}</span> : null}
+                    {skipVotes ? <span>Пропуск: {skipVotes.current}/{skipVotes.required}</span> : null}
                 </div>
             </div>
         </div>

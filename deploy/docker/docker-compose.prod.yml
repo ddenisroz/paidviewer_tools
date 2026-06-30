@@ -86,6 +86,54 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  tts_service_fake:
+    image: ${F5_TTS_IMAGE:?F5_TTS_IMAGE must be pinned to a tested tag or digest}
+    container_name: tts_tts_service_fake_prod
+    profiles: ["cloud-tts-fake"]
+    ports:
+      - "127.0.0.1:8011:8011"
+    environment:
+      - F5_TTS_SERVICE_PORT=8011
+      - F5_TTS_SERVICE_PUBLIC_BASE_URL=http://tts_service:8011
+      - F5_TTS_SERVICE_API_KEYS=${F5_TTS_SERVICE_API_KEY:?F5_TTS_SERVICE_API_KEY is required}
+      - F5_TTS_DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      - F5_TTS_DATABASE_ECHO=false
+      - F5_TTS_BASE_DIR=/app
+      - F5_TTS_ENGINE_MODE=fake
+      - F5_TTS_ENABLE_PREWARM=false
+      - F5_TTS_RUACCENT_ENABLED=false
+      - F5_TTS_TRANSCRIBER_ENABLED=false
+      - F5_TTS_MAX_INPUT_TEXT_LENGTH=2000
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-}
+      - HF_HOME=/app/f5_tts_cache
+    volumes:
+      - tts_audio:/app/audio
+      - tts_logs:/app/logs
+      - tts_backups:/app/backups
+      - tts_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      default:
+        aliases:
+          - tts_service
 
   # Bot Service - main API.
   bot_service:

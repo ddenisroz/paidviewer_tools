@@ -23,7 +23,7 @@ export const MemeAlertsHeader: React.FC<MemeAlertsHeaderProps> = ({
                 <p className="font-brand text-sm font-bold tracking-wide text-foreground">MemeAlerts</p>
                 {isConnected ? (
                     <p className="truncate text-xs text-muted-foreground">
-                        {connectedProviderLabel ? `Вход через ${connectedProviderLabel}` : 'Способ входа не сохранен'}
+                        {connectedProviderLabel ? `Вход через ${connectedProviderLabel}` : 'Способ входа не сохранён'}
                     </p>
                 ) : null}
             </div>
@@ -35,7 +35,7 @@ export const MemeAlertsHeader: React.FC<MemeAlertsHeaderProps> = ({
                 }`}
             >
                 {isConnected ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                {isConnected ? 'Токен активен' : 'Токен не подключен'}
+                {isConnected ? 'Токен активен' : 'Токен не подключён'}
             </div>
             {isConnected ? (
                 <Button

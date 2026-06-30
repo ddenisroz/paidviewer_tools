@@ -28,8 +28,10 @@ const TtsObsDockPage: React.FC = () => {
     }, []);
 
     return (
-        <div className="h-screen overflow-hidden bg-transparent text-foreground" style={{ color: '#f8fafc' }}>
-            <TtsPlayerSurface variant="dock" />
+        <div className="h-screen overflow-hidden bg-transparent text-slate-50 antialiased">
+            <div className="h-full overflow-hidden bg-[#09070f]/92 shadow-[0_20px_70px_rgba(0,0,0,0.42)] backdrop-blur-md">
+                <TtsPlayerSurface variant="dock" />
+            </div>
         </div>
     );
 };

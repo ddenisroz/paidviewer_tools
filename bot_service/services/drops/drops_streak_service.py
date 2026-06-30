@@ -4,12 +4,20 @@ import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
-from core.database import UserStreak, DropsConfig
+from core.database import PendingStreakChest, UserStreak, DropsConfig
 from core.datetime_utils import utcnow_naive
 from services.stream_session_service import StreamSessionService
 from repositories.drops_history_repository import DropsHistoryRepository
 
 logger = logging.getLogger(__name__)
+
+_QUALITY_RANK = {
+    "Common": 1,
+    "Rare": 2,
+    "Epic": 3,
+    "Legendary": 4,
+    "Mythical": 5,
+}
 
 
 class DropsStreakMixin:
@@ -38,6 +46,30 @@ class DropsStreakMixin:
         if not getattr(self, 'history_repo', None):
              self.history_repo = DropsHistoryRepository(self.db)
         return self.history_repo
+
+    def _get_pending_streak_chest(
+        self,
+        *,
+        user_id: int = None,
+        session_id: str = None,
+        channel_name: str,
+        platform: str,
+        viewer_id: str,
+    ) -> Optional[PendingStreakChest]:
+        query = self.db.query(PendingStreakChest).filter(
+            PendingStreakChest.channel_name == channel_name,
+            PendingStreakChest.platform == platform,
+            PendingStreakChest.viewer_id == viewer_id,
+            PendingStreakChest.status == "pending",
+        )
+        if user_id is not None:
+            query = query.filter(PendingStreakChest.user_id == user_id)
+        else:
+            query = query.filter(PendingStreakChest.session_id == session_id)
+        return query.first()
+
+    def _quality_rank(self, quality_name: str) -> int:
+        return _QUALITY_RANK.get(quality_name, 0)
 
     def _resolve_stream_session_id(
         self,
@@ -367,10 +399,6 @@ class DropsStreakMixin:
         if not quality:
             return None
 
-        reward = self._get_random_reward(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, quality_id=quality.id)
-        if not reward:
-            return None
-
         resolved_stream_session_id = self._resolve_stream_session_id(
             user_id=user_id,
             session_id=session_id,
@@ -378,26 +406,72 @@ class DropsStreakMixin:
             platform=platform,
             stream_session_id=stream_session_id,
         )
-        history_entry = self._record_drops_history(
-            user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name,
-            drops_type="streak", quality_id=quality.id, reward=reward, streak_days=streak.current_streak,
-            stream_session_id=resolved_stream_session_id, source_event_id=normalized_source_event_id, chat_message_id=chat_message_id
+
+        pending = self._get_pending_streak_chest(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
         )
-        if not history_entry:
+        if pending and normalized_source_event_id and pending.source_event_id == normalized_source_event_id:
+            logger.info(
+                "[DROPS] Duplicate pending streak event skipped for %s (%s)",
+                viewer_name,
+                normalized_source_event_id,
+            )
             return None
 
+        created = False
+        upgraded = False
+        now = utcnow_naive()
+        if not pending:
+            pending = PendingStreakChest(
+                user_id=user_id,
+                session_id=session_id,
+                channel_name=channel_name,
+                platform=platform,
+                viewer_id=viewer_id,
+                viewer_name=viewer_name,
+                quality_id=quality.id,
+                quality_name=quality_name,
+                streak_days=streak.current_streak,
+                messages_count=streak.messages_this_stream,
+                source_event_id=normalized_source_event_id,
+                chat_message_id=chat_message_id,
+                stream_session_id=resolved_stream_session_id,
+                status="pending",
+                created_at=now,
+                updated_at=now,
+            )
+            self.db.add(pending)
+            created = True
+        else:
+            if self._quality_rank(quality_name) > self._quality_rank(pending.quality_name):
+                pending.quality_id = quality.id
+                pending.quality_name = quality_name
+                upgraded = True
+            pending.viewer_name = viewer_name
+            pending.streak_days = max(pending.streak_days or 0, streak.current_streak)
+            pending.messages_count = streak.messages_this_stream
+            pending.source_event_id = normalized_source_event_id
+            pending.chat_message_id = chat_message_id
+            pending.stream_session_id = resolved_stream_session_id
+            pending.updated_at = now
+
+        self.db.commit()
+        self.db.refresh(pending)
+
         return {
-            "type": "streak",
+            "type": "streak_pending",
             "viewer_name": viewer_name,
-            "quality": quality_name,
-            "reward": reward.name,
-            "reward_type": reward.reward_type,
-            "reward_value": reward.reward_value,
-            "streak_days": streak.current_streak,
+            "quality": pending.quality_name,
+            "pending_chest_id": pending.id,
+            "created": created,
+            "upgraded": upgraded,
+            "streak_days": pending.streak_days,
             "stream_session_id": resolved_stream_session_id,
             "source_event_id": normalized_source_event_id,
-            "sound_file": reward.sound_file,
-            "sound_volume": reward.sound_volume
         }
 
     def process_donation_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, donation_amount: float = None, source_event_id: str = None, donation_alert_id: str = None, stream_session_id: int = None) -> Optional[Dict[str, Any]]:

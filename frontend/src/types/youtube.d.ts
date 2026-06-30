@@ -10,6 +10,7 @@ export interface YoutubeSettings {
     obs_overlay_mode?: 'video' | 'track';
     volume_level: number; // 0-100
     requests_command_enabled?: boolean;
+    request_command_name?: string;
     // Legacy single-platform reward settings
     requests_reward_enabled?: boolean;
     requests_reward_id?: string | null;
@@ -19,6 +20,11 @@ export interface YoutubeSettings {
     requests_reward_twitch_id?: string | null;
     requests_reward_vk_enabled?: boolean;
     requests_reward_vk_id?: string | null;
+    paid_orders_enabled?: boolean;
+    paid_order_mode?: 'rub_per_minute' | 'full_video';
+    paid_order_rate_rub_per_minute?: number;
+    paid_order_min_amount_rub?: number;
+    paid_order_priority_by_amount?: boolean;
     donationalerts_video_enabled?: boolean;
     donationalerts_video_min_amount?: number;
     donationalerts_video_priority_next?: boolean;

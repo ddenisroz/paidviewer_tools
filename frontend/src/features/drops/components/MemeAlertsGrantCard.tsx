@@ -29,7 +29,7 @@ export const MemeAlertsGrantCard: React.FC<MemeAlertsGrantCardProps> = ({
     <AutomationCard icon={HandCoins} title="Ручная выдача" contentClassName="grid grid-rows-[1fr_auto]">
         <div className="grid content-start gap-3">
             <div className="space-y-1.5">
-                <Label className="text-xs">Никнейм</Label>
+                <Label className="text-xs">Никнейм MemeAlerts</Label>
                 <Input
                     placeholder="nickname"
                     value={grantTarget}
@@ -39,7 +39,12 @@ export const MemeAlertsGrantCard: React.FC<MemeAlertsGrantCardProps> = ({
             </div>
             <NumberField label="Мемкоинов" value={grantValue} onChange={onGrantValueChange} />
         </div>
-        <Button type="button" onClick={onGrant} disabled={granting} className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800">
+        <Button
+            type="button"
+            onClick={onGrant}
+            disabled={granting}
+            className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
+        >
             {granting ? 'Выдаю...' : 'Выдать мемкоины'}
         </Button>
     </AutomationCard>

@@ -129,6 +129,10 @@ export const youtubeService = {
         return apiClient.post('/api/tts/youtube-settings', settings);
     },
 
+    async getObsUrl(): Promise<AxiosResponse<YoutubeObsUrlResponse>> {
+        return apiClient.get('/api/youtube/obs-url');
+    },
+
     async generateObsUrl(): Promise<AxiosResponse<YoutubeObsUrlResponse>> {
         return apiClient.post('/api/youtube/generate-obs-url');
     },

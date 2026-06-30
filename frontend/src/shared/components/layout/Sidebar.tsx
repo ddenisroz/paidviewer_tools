@@ -73,7 +73,7 @@ const getNavItems = (isAdminUser: boolean): NavItem[] => {
             submenu: [
                 { to: '/dashboard/tts', label: 'Основные настройки', icon: Settings },
                 { to: '/dashboard/tts/voices', label: 'Управление голосами', icon: Headphones },
-                { to: '/dashboard/tts/local', label: 'Локальный движок', icon: Monitor },
+                { to: '/dashboard/tts/local', label: 'Self Hosted', icon: Monitor },
             ],
         },
         {

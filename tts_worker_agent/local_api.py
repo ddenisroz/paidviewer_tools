@@ -100,8 +100,10 @@ class AgentRuntimeState:
             provider_diagnostics[provider_name] = {
                 "enabled": bool(provider_cfg.enabled),
                 "endpoint_url": provider_cfg.endpoint_url or None,
+                "mixed_language_endpoint_url": provider_cfg.mixed_language_endpoint_url or None,
                 "has_api_key": bool(provider_cfg.api_key),
                 "configured": bool(provider_cfg.enabled and provider_cfg.endpoint_url),
+                "mixed_language_configured": bool(provider_cfg.enabled and provider_cfg.mixed_language_endpoint_url),
             }
 
         return {

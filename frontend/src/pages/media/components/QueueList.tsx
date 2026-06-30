@@ -14,6 +14,8 @@ interface QueueListProps {
     currentVideo: YoutubeVideo | null;
     skipVotes?: { current: number; required: number; video_id?: number | string | null } | null;
     compact?: boolean;
+    isPlaybackActive?: boolean;
+    totalDuration?: string;
     onRemove: (id: number) => void;
     onPlay?: (video: YoutubeVideo) => void;
     onBan?: (video: YoutubeVideo) => void;
@@ -22,6 +24,8 @@ interface QueueListProps {
 const QueueList: React.FC<QueueListProps> = ({
     queue,
     currentVideo,
+    isPlaybackActive = false,
+    totalDuration,
     compact = false,
     onRemove,
     onPlay,
@@ -65,7 +69,7 @@ const QueueList: React.FC<QueueListProps> = ({
                             </div>
                             <div className="flex w-full justify-center items-center gap-1 whitespace-nowrap text-center">
                                 <Clock className="w-3 h-3" />
-                                {'\u0412\u0440\u0435\u043c\u044f'}
+                                {totalDuration ? `Время (${totalDuration})` : '\u0412\u0440\u0435\u043c\u044f'}
                             </div>
                         </>
                     )}
@@ -88,7 +92,8 @@ const QueueList: React.FC<QueueListProps> = ({
                                     <QueueItem
                                         video={currentVideo}
                                         index={-1}
-                                        isPlaying={true}
+                                        isCurrent
+                                        isPlaying={isPlaybackActive}
                                         isDraggable={false}
                                         compact={compact}
                                         onRemove={() => onRemove(currentVideo.id)}

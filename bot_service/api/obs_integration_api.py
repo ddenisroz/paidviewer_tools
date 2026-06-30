@@ -35,6 +35,10 @@ def _build_tts_source_url(token: str) -> str:
     return f"{settings.frontend_url}/tts-obs/{token}"
 
 
+def _build_youtube_obs_url(token: str) -> str:
+    return f"{settings.frontend_url}/youtube-obs/{token}"
+
+
 def get_or_create_obs_token(db: Session, user_id: int, regenerate: bool = False) -> str:
     """Get existing or create new OBS token for user."""
     user_repo = UserRepository(db)
@@ -167,6 +171,25 @@ async def get_obs_url(request: Request, user: dict = Depends(get_current_user), 
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.get("/youtube/obs-url")
+@limiter.limit("60/minute")
+async def get_youtube_obs_url(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get the stable YouTube OBS URL for the current user."""
+    try:
+        obs_token = get_or_create_obs_token(db, user["id"])
+        return {
+            "youtube_obs_url": _build_youtube_obs_url(obs_token),
+            "obs_token": obs_token,
+            "has_token": bool(obs_token),
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting YouTube OBS URL")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 
 @router.post("/tts/generate-obs-url")
 @limiter.limit("60/minute")
@@ -189,8 +212,7 @@ async def generate_youtube_obs_url(request: Request, user: dict = Depends(get_cu
     """Generate a YouTube OBS WebSocket URL."""
     try:
         obs_token = get_or_create_obs_token(db, user['id'])
-        frontend_url = settings.frontend_url
-        return {"youtube_obs_url": f"{frontend_url}/youtube-obs/{obs_token}", "obs_token": obs_token}
+        return {"youtube_obs_url": _build_youtube_obs_url(obs_token), "obs_token": obs_token}
     except HTTPException:
         raise
     except Exception:
@@ -234,8 +256,7 @@ async def regenerate_youtube_obs_url(request: Request, user: dict = Depends(get_
     """Regenerate the YouTube OBS WebSocket URL."""
     try:
         obs_token = get_or_create_obs_token(db, user['id'], regenerate=True)
-        frontend_url = settings.frontend_url
-        return {"youtube_obs_url": f"{frontend_url}/youtube-obs/{obs_token}", "obs_token": obs_token}
+        return {"youtube_obs_url": _build_youtube_obs_url(obs_token), "obs_token": obs_token}
     except HTTPException:
         raise
     except Exception:

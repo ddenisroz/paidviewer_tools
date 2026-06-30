@@ -1,3 +1,5 @@
+import { formatAppDateTime } from '@/shared/utils/dateTime';
+
 export const MEMEALERTS_API_BASE = '/api/memealerts';
 export const POPUP_STATUS_POLL_MS = 2_000;
 export const POPUP_STATUS_TIMEOUT_MS = 120_000;
@@ -85,7 +87,7 @@ export const MUTED_PANEL_CLASS = 'rounded-md border border-border/60 bg-backgrou
 export const MEMEALERTS_PROVIDER_LABELS: Record<MemeAlertsAuthProvider, string> = {
     twitch: 'Twitch',
     google: 'Google',
-    vk: 'VK',
+    vk: 'VK Live',
 };
 export const MEMEALERTS_PROVIDER_OPTIONS: MemeAlertsAuthProvider[] = ['twitch', 'google', 'vk'];
 
@@ -124,10 +126,7 @@ export const getDonationCourseRub = (coinsPerCurrency: number): number => {
 };
 
 export const formatMemeAlertsTimestamp = (value?: string): string => {
-    if (!value) return '-';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString('ru-RU', { hour12: false });
+    return formatAppDateTime(value);
 };
 
 export const formatMemeAlertsAmount = (value?: number | null): string => {

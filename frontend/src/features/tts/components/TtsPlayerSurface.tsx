@@ -83,7 +83,7 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
         <main
             className={
                 compact
-                    ? 'mx-auto grid h-screen w-full max-w-[520px] grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden p-3'
+                    ? 'grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden p-2.5'
                     : 'mx-auto flex h-screen w-full max-w-4xl flex-col gap-3 overflow-hidden p-3'
             }
         >

@@ -2,7 +2,7 @@ import base64
 from datetime import timedelta
 
 from core.datetime_utils import utcnow_naive
-from models import TTSJob, WorkerPairingToken
+from models import LocalTTSEndpoint, TTSJob, WorkerPairingToken
 
 
 def _activate_worker(client, pairing_code: str, *, supports_f5: bool = True, label: str = "Test Worker"):
@@ -126,7 +126,31 @@ def test_user_can_create_provisioning_bundle(authenticated_client):
     assert bundle["providers"]["f5"]["enabled"] is True
     assert bundle["providers"]["f5"]["endpoint_url"] == "http://127.0.0.1:8011"
     assert bundle["required_agent_version"]
+    assert payload["worker_agent_contract"]["official_mode"] == "self_host"
     assert payload["worker_agent_contract"]["recommended_path"] == "tts_worker_agent"
+
+
+def test_provisioning_bundle_includes_saved_local_runtime_key(authenticated_client, db, test_user):
+    db.add(
+        LocalTTSEndpoint(
+            user_id=test_user.id,
+            provider="f5",
+            endpoint_url="http://127.0.0.1:8011",
+            api_key="local-runtime-key",
+            use_local=True,
+        )
+    )
+    db.commit()
+
+    response = authenticated_client.post(
+        "/api/tts/workers/provisioning",
+        json={"label_hint": "Studio PC", "provider_hint": "f5"},
+    )
+    assert response.status_code == 200, response.text
+
+    bundle = response.json()["provisioning_bundle"]
+    assert bundle["providers"]["f5"]["endpoint_url"] == "http://127.0.0.1:8011"
+    assert bundle["providers"]["f5"]["api_key"] == "local-runtime-key"
 
 
 def test_worker_activation_rejects_outdated_agent_version(authenticated_client, monkeypatch):

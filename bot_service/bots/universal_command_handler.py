@@ -98,7 +98,7 @@ class UniversalCommandHandler(
 
                 if not command:
                     self.logger.debug(f"Command not found: !{command_name}")
-                    fallback_core_commands = {'sr', 'queue', 'wronglink', 'skip', 'clear'}
+                    fallback_core_commands = {'help', 'sr', 'queue', 'wronglink', 'skip', 'clear'}
                     if command_name in fallback_core_commands:
                         if not self._has_fallback_permission(command_name, user_roles):
                             await ctx.send(f"@{ctx.author.name} [ERROR] You do not have permission to use this command")
@@ -215,7 +215,7 @@ class UniversalCommandHandler(
 
                 if not command:
                     self.logger.debug(f"Command not found: !{command_name}")
-                    fallback_core_commands_vk = {'sr', 'queue', 'wronglink', 'skip', 'clear'}
+                    fallback_core_commands_vk = {'help', 'sr', 'queue', 'wronglink', 'skip', 'clear'}
                     if command_name in fallback_core_commands_vk:
                         if not self._has_fallback_permission(command_name, user_roles):
                             await vk_bot.send_message(channel_name, f"@{author_data['name']} [ERROR] You do not have permission to use this command")

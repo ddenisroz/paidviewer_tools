@@ -28,6 +28,7 @@ import {
     Users,
     XCircle,
 } from 'lucide-react';
+import { formatAppDateTime } from '@/shared/utils/dateTime';
 import { useNavigate } from 'react-router-dom';
 
 import { TABLE_CLASSES } from '@/constants/designSystem';
@@ -243,14 +244,19 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
     };
 
     return (
-        <Card className={`h-full min-w-0 ${SURFACE_CARD_CLASS}`}>
-            <CardHeader className="pb-1">
+        <Card className={`min-w-0 ${SURFACE_CARD_CLASS}`}>
+            <CardHeader className="p-3 pb-1">
                 <div className="flex min-w-0 items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <Terminal className="h-3 w-3 shrink-0 text-primary" />
                         <code className="min-w-0 truncate rounded bg-muted px-2 py-1 font-mono text-sm font-bold text-foreground">
                             !{safeCommandName}
                         </code>
+                        {safeAlias ? (
+                            <code className="min-w-0 truncate rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 font-mono text-sm font-bold text-emerald-200">
+                                !{safeAlias}
+                            </code>
+                        ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         <Switch
@@ -261,7 +267,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2 px-3 pb-3 pt-0">
                 <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{safeDescription}</p>
 
                 {showResponsePreview && (
@@ -304,19 +310,6 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                     </div>
                 </div>
 
-                {safeAlias && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-                            alias
-                        </Badge>
-                        <span className="truncate">
-                            !{safeAlias}
-                            {' -> '}
-                            !{safeCommandName}
-                        </span>
-                    </div>
-                )}
-
                 {type === 'custom' && (
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-300">
@@ -355,7 +348,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                     </div>
                 )}
 
-                <div className="flex gap-2 pt-2 border-t border-border/30">
+                <div className="flex gap-2 pt-1 border-t border-border/30">
                     <Button variant="default" size="sm" onClick={() => onEdit(command)} className="flex-1 h-8 text-xs">
                         <Edit2 className="h-3 w-3 mr-1" />
                         Настроить
@@ -475,9 +468,11 @@ const CommandsPage: React.FC = () => {
             }
             return cmd.tags.map((tag) => normalizeTag(typeof tag === 'string' ? tag : String(tag)));
         });
-        return [...new Set(normalizedTags)].sort((a, b) =>
-            a.localeCompare(b, 'ru', { sensitivity: 'base' })
-        ) as string[];
+        return [...new Set(normalizedTags)].sort((a, b) => {
+            if (a === 'Общее') return -1;
+            if (b === 'Общее') return 1;
+            return a.localeCompare(b, 'ru', { sensitivity: 'base' });
+        }) as string[];
     }, [basicCommands]);
 
     if (!isAuthenticated) {
@@ -1348,7 +1343,7 @@ const CommandsPage: React.FC = () => {
                                                 variant="outline"
                                                 className="w-fit border-sky-500/30 bg-sky-500/10 text-sky-200 md:justify-self-end"
                                             >
-                                                {cmd.created_at ? new Date(cmd.created_at).toLocaleString('ru-RU') : 'сейчас'}
+                                                {cmd.created_at ? formatAppDateTime(cmd.created_at) : 'сейчас'}
                                             </Badge>
                                         </div>
                                     ))}

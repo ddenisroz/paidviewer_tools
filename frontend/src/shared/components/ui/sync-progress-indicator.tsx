@@ -8,6 +8,7 @@ import React from 'react';
 import { AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { formatAppTime } from '@/shared/utils/dateTime';
 
 import { Progress } from './progress';
 
@@ -67,7 +68,7 @@ export const SyncProgressIndicator: React.FC<SyncProgressIndicatorProps> = ({
                 {lastReconciliation && !isReconciling && !error && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-                        <span>Синхронизировано {new Date(lastReconciliation).toLocaleTimeString('ru-RU')}</span>
+                        <span>Синхронизировано {formatAppTime(lastReconciliation)}</span>
                     </div>
                 )}
             </div>
@@ -160,7 +161,7 @@ export const ManualSyncButton: React.FC<{
             <span>{isReconciling ? 'Синхронизация...' : 'Синхронизировать'}</span>
             {lastReconciliation && !isReconciling && (
                 <span className="text-xs text-muted-foreground">
-                    ({new Date(lastReconciliation).toLocaleTimeString('ru-RU')})
+                    ({formatAppTime(lastReconciliation)})
                 </span>
             )}
         </button>

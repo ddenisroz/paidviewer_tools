@@ -8,6 +8,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
+import { formatAppDateTime } from '@/shared/utils/dateTime';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
@@ -98,14 +99,13 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
 
     const formatDate = (dateString: string | undefined) => {
         if (!dateString) return 'Не активно';
-        const date = new Date(dateString);
-        return new Intl.DateTimeFormat('ru-RU', {
+        return formatAppDateTime(dateString, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
-        }).format(date);
+        });
     };
 
     const getStreakColor = (days: number): string => {

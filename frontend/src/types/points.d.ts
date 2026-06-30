@@ -24,6 +24,7 @@ export interface PlatformReward {
     max_uses_count_per_user?: number;
     is_message_required?: boolean;
     // Twitch специфичные поля
+    is_user_input_required?: boolean;
     global_cooldown?: { seconds: number };
     global_cooldown_seconds?: number;
     max_per_stream?: number;

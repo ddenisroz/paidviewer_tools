@@ -25,6 +25,7 @@ from services.tts.provider_utils import (
     infer_provider_from_engine,
     normalize_provider_mode,
 )
+from services.tts.language_routing import detect_language_routing
 
 # API (for specific legacy checks if needed)
 from api.moderation_api import is_user_blocked_from_tts
@@ -259,6 +260,10 @@ class TTSHandlerService:
         normalized = str(error or "unknown").strip().lower()
         if "sink" in normalized:
             return "no_sink"
+        if "reward_not_configured" in normalized or "no configured reward" in normalized:
+            return "reward_not_configured"
+        if "wrong reward" in normalized or "reward mismatch" in normalized:
+            return "wrong_reward"
         if "disabled" in normalized:
             return "tts_disabled"
         if "reply" in normalized:
@@ -430,8 +435,9 @@ class TTSHandlerService:
 
         # Channel Points Mode Validation
         if hasattr(tts_settings, 'tts_mode') and tts_settings.tts_mode == 'channel_points':
-            if not self._validate_channel_points_mode(tts_settings, platform, reward_id):
-                 return {"error": "Invalid channel points configuration or mismatch"}
+            reward_validation_error = self._validate_channel_points_mode(tts_settings, platform, reward_id)
+            if reward_validation_error:
+                 return {"error": reward_validation_error}
 
         # Blocked Users Service Check
         tts_service = TTSService(db)
@@ -589,6 +595,8 @@ class TTSHandlerService:
             "source_platform": platform,
             "source_channel": channel_identifier,
         }
+        language_routing = detect_language_routing(text)
+        tts_settings_dict["language_routing"] = language_routing
         
         if engine_config["voice_settings"]:
              tts_settings_dict["voice_settings"] = engine_config["voice_settings"]
@@ -611,15 +619,23 @@ class TTSHandlerService:
             text[:200],
         )
         logger.info(
-            "[TRACE] [%s TTS] settings trace_id=%s source_message_id=%s engine=%s provider=%s voice_id=%s speed_preset=%s speed_factor=%s",
+            "[TRACE] [%s TTS] settings trace_id=%s source_message_id=%s engine=%s provider=%s tts_mode=%s voice_id=%s speed_preset=%s cfg_strength=%s speed_factor=%s route_target=%s detected_language=%s bilingual=%s reward_id=%s",
             platform.upper(),
             resolved_trace_id,
             source_message_id or "-",
             engine_config.get("engine"),
             engine_config.get("advanced_provider"),
+            getattr(tts_settings, "tts_mode", "all_messages"),
             tts_settings_dict.get("voice") or "-",
             (tts_settings_dict.get("voice_settings") or {}).get("speed_preset") or tts_settings_dict.get("speed_preset") or "-",
+            (tts_settings_dict.get("voice_settings") or {}).get("cfg_strength")
+            if (tts_settings_dict.get("voice_settings") or {}).get("cfg_strength") is not None
+            else "-",
             "-",
+            language_routing.get("route_target") or "-",
+            language_routing.get("detected_language") or "-",
+            bool(language_routing.get("requires_bilingual_checkpoint")),
+            reward_id or "-",
         )
 
         result = await tts_api.send_tts_request(
@@ -703,7 +719,7 @@ class TTSHandlerService:
                 platform=platform
             )
             logger.info(
-                "[TRACE] [%s TTS] trace_id=%s source_message_id=%s requested_provider=%s actual_provider=%s fallback=%s voice=%s speed_preset=%s speed_factor=%s audio_url=%s",
+                "[TRACE] [%s TTS] trace_id=%s source_message_id=%s requested_provider=%s actual_provider=%s fallback=%s voice=%s speed_preset=%s cfg_strength=%s speed_factor=%s endpoint_used=%s audio_url=%s",
                 platform.upper(),
                 resolved_trace_id,
                 source_message_id or "-",
@@ -715,7 +731,12 @@ class TTSHandlerService:
                 or (result.get("meta") or {}).get("speed_preset")
                 or (tts_settings_dict.get("voice_settings") or {}).get("speed_preset")
                 or "-",
+                result.get("cfg_strength")
+                or (result.get("meta") or {}).get("cfg_strength")
+                or (tts_settings_dict.get("voice_settings") or {}).get("cfg_strength")
+                or "-",
                 result.get("speed_factor") or (result.get("meta") or {}).get("speed_factor") or "-",
+                result.get("endpoint_used") or (result.get("meta") or {}).get("endpoint_used") or "-",
                 result.get("audio_url"),
             )
         else:
@@ -759,25 +780,30 @@ class TTSHandlerService:
             return owner
         return None
 
-    def _validate_channel_points_mode(self, tts_user_settings, platform, reward_id) -> bool:
+    def _validate_channel_points_mode(self, tts_user_settings, platform, reward_id) -> Optional[str]:
         logger.info(f"[REWARD] [{platform.upper()} TTS] Channel Points mode enabled")
         tts_reward_ids = tts_user_settings.tts_reward_ids or {}
         expected_reward_id = str(tts_reward_ids.get(platform) or "").strip()
         if not expected_reward_id:
             logger.warning(
-                f"[WARN] [{platform.upper()} TTS] Channel Points mode has no configured reward, falling back to all messages"
+                f"[WARN] [{platform.upper()} TTS] Channel Points mode has no configured reward"
             )
-            return True
+            return "reward_not_configured"
 
         if not reward_id:
              logger.warning(f"[ERROR] [{platform.upper()} TTS] Message not from reward redemption")
-             return False
-        
+             return "wrong_reward"
+
         if str(reward_id) != str(expected_reward_id):
              logger.warning(f"[ERROR] [{platform.upper()} TTS] Wrong reward ID: {reward_id} != {expected_reward_id}")
-             return False
-        
-        return True
+             return "wrong_reward"
+
+        logger.info(
+            "[REWARD] [%s TTS] Reward matched reward_id=%s",
+            platform.upper(),
+            expected_reward_id,
+        )
+        return None
 
     async def _match_filtered_word(self, tts_service, user_id, platform, text) -> Optional[str]:
         words = await tts_service.get_filtered_words(user_id)

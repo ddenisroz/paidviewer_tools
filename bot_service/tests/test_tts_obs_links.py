@@ -32,3 +32,21 @@ def test_tts_obs_links_regenerate_source_only(authenticated_client):
     second = response.json()
     assert second["dock_token"] == first["dock_token"]
     assert second["source_token"] != first["source_token"]
+
+
+def test_youtube_obs_url_returns_stable_url(authenticated_client, test_user):
+    first = authenticated_client.get("/api/youtube/obs-url")
+    second = authenticated_client.get("/api/youtube/obs-url")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+    first_payload = first.json()
+    second_payload = second.json()
+
+    assert first_payload["obs_token"]
+    assert first_payload["obs_token"] == second_payload["obs_token"]
+    assert first_payload["youtube_obs_url"].endswith(first_payload["obs_token"])
+
+    token_payload = verify_jwt_token(first_payload["obs_token"])
+    assert token_payload["user_id"] == test_user.id

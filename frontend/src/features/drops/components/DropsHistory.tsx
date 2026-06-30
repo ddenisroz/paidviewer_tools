@@ -10,6 +10,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { formatAppDateTime } from '@/shared/utils/dateTime';
 
 interface DropsHistoryProps {
     user: Record<string, unknown>;
@@ -103,14 +104,13 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
 
     const formatDate = useCallback((dateString: string | undefined): string => {
         if (!dateString) return 'Не указано';
-        const date = new Date(dateString);
-        return new Intl.DateTimeFormat('ru-RU', {
+        return formatAppDateTime(dateString, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
-        }).format(date);
+        });
     }, []);
 
     const getDropsTypeLabel = useCallback((type: string | undefined): string => {

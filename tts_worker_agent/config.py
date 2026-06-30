@@ -114,6 +114,7 @@ def _unprotect_secret(value: str) -> str:
 class ProviderRuntimeConfig:
     enabled: bool = False
     endpoint_url: str = ""
+    mixed_language_endpoint_url: str = ""
     api_key: str = ""
 
     @classmethod
@@ -122,6 +123,7 @@ class ProviderRuntimeConfig:
         return cls(
             enabled=bool(payload.get("enabled", False)),
             endpoint_url=str(payload.get("endpoint_url") or "").strip(),
+            mixed_language_endpoint_url=str(payload.get("mixed_language_endpoint_url") or "").strip(),
             api_key=_unprotect_secret(str(payload.get("api_key") or "").strip()),
         )
 
@@ -129,6 +131,7 @@ class ProviderRuntimeConfig:
         return {
             "enabled": bool(self.enabled),
             "endpoint_url": self.endpoint_url,
+            "mixed_language_endpoint_url": self.mixed_language_endpoint_url,
             "api_key": _protect_secret(self.api_key),
         }
 
@@ -213,7 +216,7 @@ def load_config(path: Path | None = None) -> AgentConfig:
         shutil.copyfile(DEFAULT_CONFIG_TEMPLATE_PATH, config_path)
     if not config_path.exists():
         raise FileNotFoundError(f"Worker agent config was not found: {config_path}")
-    with config_path.open("r", encoding="utf-8") as handle:
+    with config_path.open("r", encoding="utf-8-sig") as handle:
         payload = json.load(handle)
     config = AgentConfig.from_dict(payload)
     config.validate()
@@ -229,7 +232,7 @@ def save_config(config: AgentConfig, path: Path | None = None) -> None:
 
 
 def load_provisioning_bundle(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         payload = json.load(handle)
     if str(payload.get("kind") or "").strip() != PROVISIONING_KIND:
         raise ValueError(f"Provisioning file is not a {PROVISIONING_KIND} bundle: {path}")
@@ -327,6 +330,10 @@ def apply_provisioning_bundle(
         endpoint_url = str(provider_payload.get("endpoint_url") or "").strip()
         if endpoint_url:
             current_provider.endpoint_url = endpoint_url
+
+        mixed_language_endpoint_url = str(provider_payload.get("mixed_language_endpoint_url") or "").strip()
+        if mixed_language_endpoint_url:
+            current_provider.mixed_language_endpoint_url = mixed_language_endpoint_url
 
         api_key = str(provider_payload.get("api_key") or "").strip()
         if api_key:

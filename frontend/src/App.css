@@ -651,8 +651,29 @@ body.pv-overlay-route #root {
     background: transparent !important;
 }
 
+html.pv-overlay-route,
+body.pv-overlay-route {
+    width: 100%;
+    height: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
 body.pv-overlay-route {
     overflow: hidden;
+}
+
+body.pv-overlay-route #root {
+    height: 100vh;
+    min-height: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+body.pv-overlay-route .chatbox-overlay-font-scope {
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 @keyframes fade-in {

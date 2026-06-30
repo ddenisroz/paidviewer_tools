@@ -5,6 +5,7 @@ import { DollarSign, History } from 'lucide-react';
 import { useDropsHistory } from '@/queries/drops/dropsQueries';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { formatAppDateTime } from '@/shared/utils/dateTime';
 
 import type { DonationEntry } from '../../../types';
 
@@ -29,13 +30,12 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
     const history: DonationEntry[] = historyData?.data || [];
 
     const formatDate = (dateString: string): string => {
-        const date = new Date(dateString);
-        return new Intl.DateTimeFormat('ru-RU', {
+        return formatAppDateTime(dateString, {
             day: '2-digit',
             month: 'short',
             hour: '2-digit',
             minute: '2-digit',
-        }).format(date);
+        });
     };
 
     const getQualityColor = (quality?: { name?: string }): string => {

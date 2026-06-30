@@ -105,3 +105,17 @@ def test_youtube_settings_route_stores_canonical_reward_state(authenticated_clie
     assert "requests_reward_platform" not in youtube_settings
     assert youtube_settings["requests_reward_vk_enabled"] is True
     assert youtube_settings["requests_reward_vk_id"] == "VK Video Reward"
+
+
+def test_youtube_settings_rejects_paid_orders_without_donationalerts(authenticated_client):
+    response = authenticated_client.post(
+        "/api/tts/youtube-settings",
+        json={
+            "paid_orders_enabled": True,
+            "donationalerts_video_enabled": True,
+        },
+        headers=_csrf_headers(authenticated_client),
+    )
+
+    assert response.status_code == 400
+    assert "DonationAlerts" in response.json()["detail"]

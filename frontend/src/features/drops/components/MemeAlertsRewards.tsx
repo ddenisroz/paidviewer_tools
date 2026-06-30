@@ -31,8 +31,10 @@ import apiClient from '@/services/api/client';
 import { integrationsService } from '@/services/api/services/integrationsService';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
+import { normalizeDateInput } from '@/shared/utils/dateTime';
 
 import type { AxiosError } from 'axios';
+import type { PlatformReward } from '@/types';
 
 export const MemeAlertsRewards: React.FC = () => {
     const { integrations } = useIntegrations();
@@ -49,7 +51,9 @@ export const MemeAlertsRewards: React.FC = () => {
     const [grantValue, setGrantValue] = useState<number>(10);
     const [granting, setGranting] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState<string | null>(null);
     const [balancesLoading, setBalancesLoading] = useState(false);
+    const [balancesError, setBalancesError] = useState<string | null>(null);
     const [balances, setBalances] = useState<MemeAlertsBalanceItem[]>([]);
     const [settingsLoading, setSettingsLoading] = useState(false);
     const [settingsSaving, setSettingsSaving] = useState(false);
@@ -64,12 +68,12 @@ export const MemeAlertsRewards: React.FC = () => {
     const [automationSettings, setAutomationSettings] =
         useState<MemeAlertsAutomationSettings>(DEFAULT_AUTOMATION_SETTINGS);
     const [history, setHistory] = useState<{
-        grants: MemeAlertsHistoryItem[];
-        purchases: MemeAlertsHistoryItem[];
+        history: MemeAlertsHistoryItem[];
+        localGrants: MemeAlertsHistoryItem[];
         unknown: MemeAlertsHistoryItem[];
     }>({
-        grants: [],
-        purchases: [],
+        history: [],
+        localGrants: [],
         unknown: [],
     });
     const popupRef = React.useRef<Window | null>(null);
@@ -91,27 +95,24 @@ export const MemeAlertsRewards: React.FC = () => {
         }
     }, []);
 
-    const finishConnectFlow = useCallback(
-        (nextState: PopupAuthState, note?: string | null) => {
-            setPopupState(nextState);
-            if (note !== undefined) {
-                setConnectionNote(note);
+    const finishConnectFlow = useCallback((nextState: PopupAuthState, note?: string | null) => {
+        setPopupState(nextState);
+        if (note !== undefined) {
+            setConnectionNote(note);
+        }
+        if (nextState === 'error' && note) {
+            if (lastPopupErrorToastRef.current !== note) {
+                toast.error(note);
+                lastPopupErrorToastRef.current = note;
             }
-            if (nextState === 'error' && note) {
-                if (lastPopupErrorToastRef.current !== note) {
-                    toast.error(note);
-                    lastPopupErrorToastRef.current = note;
-                }
-            } else if (nextState === 'success' || nextState === 'idle') {
-                lastPopupErrorToastRef.current = null;
-            }
-            if (nextState === 'success' || nextState === 'error' || nextState === 'idle') {
-                setConnecting(false);
-                setConnectingProvider(null);
-            }
-        },
-        []
-    );
+        } else if (nextState === 'success' || nextState === 'idle') {
+            lastPopupErrorToastRef.current = null;
+        }
+        if (nextState === 'success' || nextState === 'error' || nextState === 'idle') {
+            setConnecting(false);
+            setConnectingProvider(null);
+        }
+    }, []);
 
     const checkStatus = useCallback(async (): Promise<boolean> => {
         try {
@@ -140,44 +141,47 @@ export const MemeAlertsRewards: React.FC = () => {
         }
     }, []);
 
-    const startPopupWatcher = useCallback((detachedPopup = false) => {
-        stopPopupWatcher(false);
-        detachedPopupPollingRef.current = detachedPopup;
-        popupWatcherStartedAtRef.current = Date.now();
-        popupWatcherRef.current = window.setInterval(() => {
-            if (Date.now() - popupWatcherStartedAtRef.current > POPUP_STATUS_TIMEOUT_MS) {
-                stopPopupWatcher();
-                finishConnectFlow(
-                    'error',
-                    'Страница авторизации MemeAlerts не вернула токен. Повторите подключение.'
-                );
-                return;
-            }
-            if (statusPollingRef.current) return;
-            statusPollingRef.current = true;
-            void checkStatus()
-                .then((connected) => {
-                    if (connected) {
-                        toast.success('MemeAlerts подключен');
-                        if (popupRef.current && !popupRef.current.closed) {
-                            popupRef.current.close();
+    const startPopupWatcher = useCallback(
+        (detachedPopup = false) => {
+            stopPopupWatcher(false);
+            detachedPopupPollingRef.current = detachedPopup;
+            popupWatcherStartedAtRef.current = Date.now();
+            popupWatcherRef.current = window.setInterval(() => {
+                if (Date.now() - popupWatcherStartedAtRef.current > POPUP_STATUS_TIMEOUT_MS) {
+                    stopPopupWatcher();
+                    finishConnectFlow(
+                        'error',
+                        'Страница авторизации MemeAlerts не вернула токен. Повторите подключение.'
+                    );
+                    return;
+                }
+                if (statusPollingRef.current) return;
+                statusPollingRef.current = true;
+                void checkStatus()
+                    .then((connected) => {
+                        if (connected) {
+                            toast.success('MemeAlerts подключен');
+                            if (popupRef.current && !popupRef.current.closed) {
+                                popupRef.current.close();
+                            }
+                            stopPopupWatcher();
+                            finishConnectFlow('success', null);
+                            return;
                         }
-                        stopPopupWatcher();
-                        finishConnectFlow('success', null);
-                        return;
-                    }
 
-                    const popup = popupRef.current;
-                    if (!detachedPopupPollingRef.current && (!popup || popup.closed)) {
-                        stopPopupWatcher();
-                        finishConnectFlow('idle');
-                    }
-                })
-                .finally(() => {
-                    statusPollingRef.current = false;
-                });
-        }, POPUP_STATUS_POLL_MS);
-    }, [checkStatus, finishConnectFlow, stopPopupWatcher]);
+                        const popup = popupRef.current;
+                        if (!detachedPopupPollingRef.current && (!popup || popup.closed)) {
+                            stopPopupWatcher();
+                            finishConnectFlow('idle');
+                        }
+                    })
+                    .finally(() => {
+                        statusPollingRef.current = false;
+                    });
+            }, POPUP_STATUS_POLL_MS);
+        },
+        [checkStatus, finishConnectFlow, stopPopupWatcher]
+    );
 
     const handleProxyAuthResult = useCallback(
         async (data: { ok?: boolean; status?: number; source?: string; detail?: string }) => {
@@ -206,7 +210,10 @@ export const MemeAlertsRewards: React.FC = () => {
             if (!data.state) return;
 
             if (data.state === 'token_found' || data.state === 'connect_posted') {
-                finishConnectFlow(data.ok === false ? 'error' : 'saving', data.ok === false ? data.detail || null : null);
+                finishConnectFlow(
+                    data.ok === false ? 'error' : 'saving',
+                    data.ok === false ? data.detail || null : null
+                );
                 return;
             }
 
@@ -237,16 +244,19 @@ export const MemeAlertsRewards: React.FC = () => {
     const fetchHistory = async () => {
         try {
             setHistoryLoading(true);
+            setHistoryError(null);
             const { data } = await apiClient.get(`${MEMEALERTS_API_BASE}/history`, {
                 params: { limit: 50 },
             });
+            const payload = data?.data && typeof data.data === 'object' ? data.data : data;
             setHistory({
-                grants: data.grants || [],
-                purchases: data.purchases || [],
-                unknown: data.unknown || [],
+                history: payload.history || payload.purchases || [],
+                localGrants: payload.local_grants || payload.grants || [],
+                unknown: payload.unknown || [],
             });
         } catch (error) {
             logger.error('History load error', error);
+            setHistoryError('Не удалось загрузить историю MemeAlerts');
         } finally {
             setHistoryLoading(false);
         }
@@ -255,13 +265,20 @@ export const MemeAlertsRewards: React.FC = () => {
     const fetchBalances = useCallback(async () => {
         try {
             setBalancesLoading(true);
+            setBalancesError(null);
             const { data } = await apiClient.get(`${MEMEALERTS_API_BASE}/balances`, {
                 params: { limit: 200 },
             });
-            setBalances(Array.isArray(data?.balances) ? data.balances : []);
+            const payload = data?.data && typeof data.data === 'object' ? data.data : data;
+            setBalances(Array.isArray(payload?.balances) ? payload.balances : []);
         } catch (error) {
             logger.error('MemeAlerts balances load error', error);
-            toast.error('Не удалось загрузить баланс мемкоинов');
+            const axiosError = error as AxiosError<{ detail?: string; error?: string }>;
+            setBalancesError(
+                axiosError.response?.data?.detail ||
+                    axiosError.response?.data?.error ||
+                    'Не удалось загрузить баланс мемкоинов'
+            );
         } finally {
             setBalancesLoading(false);
         }
@@ -349,42 +366,96 @@ export const MemeAlertsRewards: React.FC = () => {
         selectedRewardPlatform,
     ]);
 
-    const saveTokenToBackend = useCallback(async (accessToken: string, refreshToken?: string, streamerId?: string) => {
-        try {
-            const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/connect`, {
-                access_token: accessToken,
-                refresh_token: refreshToken,
-                streamer_id: streamerId,
-                auth_provider: connectingProvider,
-            });
+    const handleAttachPointsReward = useCallback(
+        async (reward: PlatformReward) => {
+            try {
+                if (selectedRewardPlatform === 'twitch' && !integrations?.twitch?.enabled) {
+                    toast.error('Сначала подключите Twitch интеграцию');
+                    return;
+                }
+                if (selectedRewardPlatform === 'vk' && !integrations?.vk?.enabled) {
+                    toast.error('Сначала подключите VK Live интеграцию');
+                    return;
+                }
 
-            if (data.success && data.connected) {
-                setIsConnected(true);
-                finishConnectFlow('success', null);
-                toast.success('MemeAlerts подключен!', {
-                    description: 'Теперь вы можете выдавать мемкоины',
+                setRewardCreating(true);
+                const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/rewards/attach`, {
+                    local_id: editingRewardId || undefined,
+                    platform: selectedRewardPlatform,
+                    reward_id: String(reward.id),
+                    coins_amount: rewardCoinsAmount,
                 });
-                return true;
-            } else {
-                const message = data.detail || data.error || 'MemeAlerts не подтвердил токен';
+                if (!data?.success) {
+                    throw new Error(data?.detail || data?.error || 'Не удалось привязать награду');
+                }
+                toast.success('Награда привязана');
+                setEditingRewardId(null);
+                if (data?.data?.all_settings) {
+                    setAutomationSettings(normalizeAutomationSettings(data.data.all_settings));
+                } else {
+                    await fetchSettings();
+                }
+            } catch (error) {
+                const axiosError = error as AxiosError<{ detail?: string; error?: string }>;
+                const message =
+                    axiosError.response?.data?.detail ||
+                    axiosError.response?.data?.error ||
+                    (error instanceof Error ? error.message : 'Ошибка привязки награды');
+                toast.error(message);
+            } finally {
+                setRewardCreating(false);
+            }
+        },
+        [
+            editingRewardId,
+            fetchSettings,
+            integrations?.twitch?.enabled,
+            integrations?.vk?.enabled,
+            rewardCoinsAmount,
+            selectedRewardPlatform,
+        ]
+    );
+
+    const saveTokenToBackend = useCallback(
+        async (accessToken: string, refreshToken?: string, streamerId?: string) => {
+            try {
+                const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/connect`, {
+                    access_token: accessToken,
+                    refresh_token: refreshToken,
+                    streamer_id: streamerId,
+                    auth_provider: connectingProvider,
+                });
+
+                if (data.success && data.connected) {
+                    setIsConnected(true);
+                    finishConnectFlow('success', null);
+                    toast.success('MemeAlerts подключен!', {
+                        description: 'Теперь вы можете выдавать мемкоины',
+                    });
+                    return true;
+                } else {
+                    const message = data.detail || data.error || 'MemeAlerts не подтвердил токен';
+                    finishConnectFlow('error', message);
+                    toast.error(message, {
+                        description: 'Токен не сохранен',
+                    });
+                    return false;
+                }
+            } catch (error) {
+                const axiosError = error as AxiosError<{ detail?: string; error?: string }>;
+                const backendMessage = axiosError.response?.data?.detail || axiosError.response?.data?.error;
+                const message =
+                    axiosError.response?.status === 400
+                        ? backendMessage ||
+                          'Токен MemeAlerts пока не готов. Завершите вход в окне авторизации и повторите попытку.'
+                        : backendMessage || 'Ошибка сети при сохранении токена';
                 finishConnectFlow('error', message);
-                toast.error(message, {
-                    description: 'Токен не сохранен',
-                });
+                toast.error(message);
                 return false;
             }
-        } catch (error) {
-            const axiosError = error as AxiosError<{ detail?: string; error?: string }>;
-            const backendMessage = axiosError.response?.data?.detail || axiosError.response?.data?.error;
-            const message =
-                axiosError.response?.status === 400
-                    ? backendMessage || 'Токен MemeAlerts пока не готов. Завершите вход в окне авторизации и повторите попытку.'
-                    : backendMessage || 'Ошибка сети при сохранении токена';
-            finishConnectFlow('error', message);
-            toast.error(message);
-            return false;
-        }
-    }, [connectingProvider, finishConnectFlow]);
+        },
+        [connectingProvider, finishConnectFlow]
+    );
 
     // Listen for postMessage from the proxy popup with the extracted token.
     useEffect(() => {
@@ -505,47 +576,50 @@ export const MemeAlertsRewards: React.FC = () => {
         }
     }, [automationSettings.points_rewards, editingRewardId, selectedRewardPlatform]);
 
-    const handleConnect = useCallback((provider: MemeAlertsAuthProvider) => {
-        setConnecting(true);
-        setConnectingProvider(provider);
-        finishConnectFlow('redirecting', null);
-        stopPopupWatcher();
+    const handleConnect = useCallback(
+        (provider: MemeAlertsAuthProvider) => {
+            setConnecting(true);
+            setConnectingProvider(provider);
+            finishConnectFlow('redirecting', null);
+            stopPopupWatcher();
 
-        const redirectUrl = getSafeNavigationUrl(
-            `/api/memealerts/connect-redirect?provider=${encodeURIComponent(provider)}`
-        );
-        if (!redirectUrl) {
-            toast.error('Не удалось открыть MemeAlerts');
-            finishConnectFlow('error', 'Не удалось открыть окно авторизации MemeAlerts.');
-            setConnectingProvider(null);
-            return;
-        }
+            const redirectUrl = getSafeNavigationUrl(
+                `/api/memealerts/connect-redirect?provider=${encodeURIComponent(provider)}`
+            );
+            if (!redirectUrl) {
+                toast.error('Не удалось открыть MemeAlerts');
+                finishConnectFlow('error', 'Не удалось открыть окно авторизации MemeAlerts.');
+                setConnectingProvider(null);
+                return;
+            }
 
-        const popupWidth = 540;
-        const popupHeight = 760;
-        const left = window.screenX + Math.max(0, Math.round((window.outerWidth - popupWidth) / 2));
-        const top = window.screenY + Math.max(0, Math.round((window.outerHeight - popupHeight) / 2));
-        const features = [
-            `width=${popupWidth}`,
-            `height=${popupHeight}`,
-            `left=${left}`,
-            `top=${top}`,
-            'resizable=yes',
-            'scrollbars=yes',
-        ].join(',');
+            const popupWidth = 540;
+            const popupHeight = 760;
+            const left = window.screenX + Math.max(0, Math.round((window.outerWidth - popupWidth) / 2));
+            const top = window.screenY + Math.max(0, Math.round((window.outerHeight - popupHeight) / 2));
+            const features = [
+                `width=${popupWidth}`,
+                `height=${popupHeight}`,
+                `left=${left}`,
+                `top=${top}`,
+                'resizable=yes',
+                'scrollbars=yes',
+            ].join(',');
 
-        const popup = window.open('', 'memealerts-auth', features);
-        if (popup) {
-            popupRef.current = popup;
-            startPopupWatcher();
-            popup.location.href = redirectUrl;
-            popup.focus();
-            return;
-        }
+            const popup = window.open('', 'memealerts-auth', features);
+            if (popup) {
+                popupRef.current = popup;
+                startPopupWatcher();
+                popup.location.href = redirectUrl;
+                popup.focus();
+                return;
+            }
 
-        startPopupWatcher(true);
-        window.location.assign(redirectUrl);
-    }, [finishConnectFlow, startPopupWatcher, stopPopupWatcher]);
+            startPopupWatcher(true);
+            window.location.assign(redirectUrl);
+        },
+        [finishConnectFlow, startPopupWatcher, stopPopupWatcher]
+    );
 
     const handleDisconnect = async () => {
         try {
@@ -699,9 +773,9 @@ export const MemeAlertsRewards: React.FC = () => {
     };
     const canCreateMoreRewards = configuredRewards.length < 3 || Boolean(editingRewardId);
     const donationCourseRub = getDonationCourseRub(automationSettings.donation_auto.coins_per_currency);
-    const historyRows = [...history.grants].sort((a, b) => {
-        const left = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const right = b.created_at ? new Date(b.created_at).getTime() : 0;
+    const historyRows = [...history.localGrants].sort((a, b) => {
+        const left = normalizeDateInput(a.created_at)?.getTime() ?? 0;
+        const right = normalizeDateInput(b.created_at)?.getTime() ?? 0;
         return right - left;
     });
     const authStatusText = connecting
@@ -728,88 +802,90 @@ export const MemeAlertsRewards: React.FC = () => {
             {!isConnected ? (
                 <MemeAlertsConnectPanel
                     connecting={connecting}
+                    connectedProvider={connectionInfo?.authProvider || null}
                     popupState={popupState}
                     authStatusText={authStatusText}
                     onConnect={handleConnect}
                 />
             ) : (
-                <div className="grid grid-cols-[minmax(0,1fr)_clamp(260px,27vw,360px)] items-start gap-3">
-                    <div className="min-w-0 space-y-4">
-                        <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] items-stretch gap-2.5">
-                            <MemeAlertsGrantCard
-                                grantTarget={grantTarget}
-                                grantValue={grantValue}
-                                granting={granting}
-                                onGrantTargetChange={setGrantTarget}
-                                onGrantValueChange={setGrantValue}
-                                onGrant={handleGrant}
-                            />
-                            <MemeAlertsPlatformRewardCard
-                                platform={selectedRewardPlatform}
-                                platformConnected={selectedPlatformConnected}
-                                platformAvailability={platformAvailability}
-                                title={rewardTitle}
-                                cost={rewardCost}
-                                coinsAmount={rewardCoinsAmount}
-                                canCreateMoreRewards={canCreateMoreRewards}
-                                creating={rewardCreating}
-                                settingsLoading={settingsLoading}
-                                editingRewardId={editingRewardId}
-                                onPlatformChange={(platform) => {
-                                    setSelectedRewardPlatform(platform);
-                                    setEditingRewardId(null);
-                                }}
-                                onTitleChange={setRewardTitle}
-                                onCostChange={setRewardCost}
-                                onCoinsAmountChange={setRewardCoinsAmount}
-                                onCreate={handleCreatePointsReward}
-                                onCancelEdit={handleResetRewardForm}
-                            />
-                            <MemeAlertsDonationCard
-                                donationAlertsConnected={donationAlertsConnected}
-                                enabled={automationSettings.donation_auto.enabled}
-                                courseRub={donationCourseRub}
-                                saving={settingsSaving}
-                                authStarted={donationAuthStarted}
-                                onConnectDonationAlerts={handleConnectDonationAlerts}
-                                onCourseRubChange={(rub) => {
-                                    setAutomationSettings((prev) => ({
-                                        ...prev,
-                                        donation_auto: {
-                                            ...prev.donation_auto,
-                                            coins_per_currency: 1 / rub,
-                                            min_donation_amount: 1,
-                                        },
-                                    }));
-                                }}
-                                onToggleEnabled={() => {
-                                    setAutomationSettings((prev) => ({
-                                        ...prev,
-                                        donation_auto: {
-                                            ...prev.donation_auto,
-                                            enabled: !prev.donation_auto.enabled,
-                                        },
-                                    }));
-                                }}
-                                onSave={handleSaveDonationAuto}
-                            />
-                        </div>
-
-                        <MemeAlertsConfiguredRewards
-                            rewards={configuredRewards}
-                            settingsSaving={settingsSaving}
-                            deletingId={rewardDeletingId}
-                            onToggle={handleToggleReward}
-                            onEdit={handleEditReward}
-                            onDelete={handleDeleteReward}
+                <div className="min-w-0 space-y-4">
+                    <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] items-stretch gap-2.5">
+                        <MemeAlertsGrantCard
+                            grantTarget={grantTarget}
+                            grantValue={grantValue}
+                            granting={granting}
+                            onGrantTargetChange={setGrantTarget}
+                            onGrantValueChange={setGrantValue}
+                            onGrant={handleGrant}
+                        />
+                        <MemeAlertsPlatformRewardCard
+                            platform={selectedRewardPlatform}
+                            platformConnected={selectedPlatformConnected}
+                            platformAvailability={platformAvailability}
+                            title={rewardTitle}
+                            cost={rewardCost}
+                            coinsAmount={rewardCoinsAmount}
+                            canCreateMoreRewards={canCreateMoreRewards}
+                            creating={rewardCreating}
+                            settingsLoading={settingsLoading}
+                            editingRewardId={editingRewardId}
+                            onPlatformChange={(platform) => {
+                                setSelectedRewardPlatform(platform);
+                                setEditingRewardId(null);
+                            }}
+                            onTitleChange={setRewardTitle}
+                            onCostChange={setRewardCost}
+                            onCoinsAmountChange={setRewardCoinsAmount}
+                            onCreate={handleCreatePointsReward}
+                            onAttach={handleAttachPointsReward}
+                            onCancelEdit={handleResetRewardForm}
+                        />
+                        <MemeAlertsDonationCard
+                            donationAlertsConnected={donationAlertsConnected}
+                            enabled={automationSettings.donation_auto.enabled}
+                            courseRub={donationCourseRub}
+                            saving={settingsSaving}
+                            authStarted={donationAuthStarted}
+                            onConnectDonationAlerts={handleConnectDonationAlerts}
+                            onCourseRubChange={(rub) => {
+                                setAutomationSettings((prev) => ({
+                                    ...prev,
+                                    donation_auto: {
+                                        ...prev.donation_auto,
+                                        coins_per_currency: 1 / rub,
+                                        min_donation_amount: 1,
+                                    },
+                                }));
+                            }}
+                            onToggleEnabled={() => {
+                                setAutomationSettings((prev) => ({
+                                    ...prev,
+                                    donation_auto: {
+                                        ...prev.donation_auto,
+                                        enabled: !prev.donation_auto.enabled,
+                                    },
+                                }));
+                            }}
+                            onSave={handleSaveDonationAuto}
                         />
                     </div>
+
+                    <MemeAlertsConfiguredRewards
+                        rewards={configuredRewards}
+                        settingsSaving={settingsSaving}
+                        deletingId={rewardDeletingId}
+                        onToggle={handleToggleReward}
+                        onEdit={handleEditReward}
+                        onDelete={handleDeleteReward}
+                    />
 
                     <MemeAlertsHistoryCard
                         historyRows={historyRows}
                         historyLoading={historyLoading}
+                        historyError={historyError}
                         balanceRows={balances}
                         balancesLoading={balancesLoading}
+                        balancesError={balancesError}
                         onRefreshHistory={fetchHistory}
                         onRefreshBalances={fetchBalances}
                     />

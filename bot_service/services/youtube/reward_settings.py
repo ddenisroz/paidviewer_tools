@@ -26,6 +26,12 @@ DONATIONALERTS_VIDEO_KEYS = (
     "donationalerts_video_priority_next",
 )
 
+PAID_ORDER_MODES = {"rub_per_minute", "full_video"}
+
+
+def normalize_paid_order_mode(value: object) -> str:
+    return str(value) if value in PAID_ORDER_MODES else "rub_per_minute"
+
 
 def clean_optional_reward_value(value: object) -> Optional[str]:
     """Normalize reward identifiers/titles coming from API payloads or DB JSON."""
@@ -129,6 +135,31 @@ def build_youtube_settings_response(youtube_settings: Mapping[str, Any] | None) 
         "obs_overlay_mode": normalize_obs_overlay_mode(canonical.get("obs_overlay_mode", "track")),
         "volume_level": canonical.get("volume_level", 100),
         "requests_command_enabled": canonical.get("requests_command_enabled", True),
+        "request_command_name": str(canonical.get("request_command_name") or "!sr"),
+        "paid_orders_enabled": bool(
+            canonical.get("paid_orders_enabled", canonical.get("donationalerts_video_enabled", False))
+        ),
+        "paid_order_mode": normalize_paid_order_mode(canonical.get("paid_order_mode", "rub_per_minute")),
+        "paid_order_rate_rub_per_minute": float(
+            canonical.get(
+                "paid_order_rate_rub_per_minute",
+                canonical.get("donationalerts_video_min_amount", 0),
+            )
+            or 0
+        ),
+        "paid_order_min_amount_rub": float(
+            canonical.get(
+                "paid_order_min_amount_rub",
+                canonical.get("donationalerts_video_min_amount", 0),
+            )
+            or 0
+        ),
+        "paid_order_priority_by_amount": bool(
+            canonical.get(
+                "paid_order_priority_by_amount",
+                canonical.get("donationalerts_video_priority_next", True),
+            )
+        ),
         "donationalerts_video_enabled": bool(canonical.get("donationalerts_video_enabled", False)),
         "donationalerts_video_min_amount": float(canonical.get("donationalerts_video_min_amount", 0) or 0),
         "donationalerts_video_priority_next": bool(canonical.get("donationalerts_video_priority_next", True)),
@@ -199,9 +230,46 @@ def apply_youtube_settings_update(
             "requests_reward_twitch_id": reward_view["requests_reward_twitch_id"],
             "requests_reward_vk_enabled": reward_view["requests_reward_vk_enabled"],
             "requests_reward_vk_id": reward_view["requests_reward_vk_id"],
-            "donationalerts_video_enabled": bool(merged.get("donationalerts_video_enabled", False)),
-            "donationalerts_video_min_amount": max(0.0, float(merged.get("donationalerts_video_min_amount", 0) or 0)),
-            "donationalerts_video_priority_next": bool(merged.get("donationalerts_video_priority_next", True)),
+            "request_command_name": str(merged.get("request_command_name") or "!sr").strip() or "!sr",
+            "paid_orders_enabled": bool(merged.get("paid_orders_enabled", merged.get("donationalerts_video_enabled", False))),
+            "paid_order_mode": normalize_paid_order_mode(merged.get("paid_order_mode", "rub_per_minute")),
+            "paid_order_rate_rub_per_minute": max(
+                0.0,
+                float(
+                    merged.get(
+                        "paid_order_rate_rub_per_minute",
+                        merged.get("donationalerts_video_min_amount", 0),
+                    )
+                    or 0
+                ),
+            ),
+            "paid_order_min_amount_rub": max(
+                0.0,
+                float(
+                    merged.get(
+                        "paid_order_min_amount_rub",
+                        merged.get("donationalerts_video_min_amount", 0),
+                    )
+                    or 0
+                ),
+            ),
+            "paid_order_priority_by_amount": bool(
+                merged.get("paid_order_priority_by_amount", merged.get("donationalerts_video_priority_next", True))
+            ),
+            "donationalerts_video_enabled": bool(merged.get("donationalerts_video_enabled", merged.get("paid_orders_enabled", False))),
+            "donationalerts_video_min_amount": max(
+                0.0,
+                float(
+                    merged.get(
+                        "donationalerts_video_min_amount",
+                        merged.get("paid_order_rate_rub_per_minute", merged.get("paid_order_min_amount_rub", 0)),
+                    )
+                    or 0
+                ),
+            ),
+            "donationalerts_video_priority_next": bool(
+                merged.get("donationalerts_video_priority_next", merged.get("paid_order_priority_by_amount", True))
+            ),
         }
     )
     return canonicalize_youtube_settings(merged)

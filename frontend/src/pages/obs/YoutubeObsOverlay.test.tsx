@@ -80,9 +80,9 @@ describe('YoutubeObsOverlay', () => {
             expect(screen.getByText('Paid Overlay Video')).toBeInTheDocument();
         });
 
-        expect(screen.getByText('Requested by: Paid Donor')).toBeInTheDocument();
-        expect(screen.getByText('Paid video')).toBeInTheDocument();
-        expect(screen.getByText('Skip: 2/4')).toBeInTheDocument();
+        expect(screen.getByText('Заказал: Paid Donor')).toBeInTheDocument();
+        expect(screen.getByText('Платные заказы')).toBeInTheDocument();
+        expect(screen.getByText('Пропуск: 2/4')).toBeInTheDocument();
         expect(screen.queryByTitle('Paid Overlay Video')).not.toBeInTheDocument();
     });
 
@@ -109,8 +109,8 @@ describe('YoutubeObsOverlay', () => {
         });
 
         expect(container.querySelector('iframe')).toBeInTheDocument();
-        expect(screen.getByText('Requested by: Paid Donor')).toBeInTheDocument();
-        expect(screen.getByText('Paid video')).toBeInTheDocument();
-        expect(screen.getByText('Skip: 2/4')).toBeInTheDocument();
+        expect(screen.getByText('Заказал: Paid Donor')).toBeInTheDocument();
+        expect(screen.getByText('Платные заказы')).toBeInTheDocument();
+        expect(screen.getByText('Пропуск: 2/4')).toBeInTheDocument();
     });
 });

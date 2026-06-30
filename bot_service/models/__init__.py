@@ -44,6 +44,7 @@ from models.drops import (
     DropsType,
     MemeAlertsGrantHistory,
     MythicalDropsSession,
+    PendingStreakChest,
     StreamSession,
     UserStreak,
 )
@@ -103,6 +104,7 @@ __all__ = [
     "DropsHistory",
     "MemeAlertsGrantHistory",
     "MythicalDropsSession",
+    "PendingStreakChest",
     "StreamSession",
     "Achievement",
     "UserAchievement",

@@ -9,7 +9,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
-from core.database import get_db, DropsHistory, ChatMessage
+from core.database import get_db, DropsHistory, ChatMessage, PendingStreakChest
+from core.datetime_utils import utcnow_naive
 from auth.auth import get_current_user, get_current_user_optional
 from utils.enhanced_logger import drops_logger
 logger = logging.getLogger(__name__)
@@ -141,18 +142,25 @@ async def open_drops(request: DropsOpenRequest, current_user: dict=Depends(get_c
         if not config:
             raise HTTPException(status_code=404, detail='Drops configuration not found.')
         quality_name = None
+        pending_chest = None
         if request.drops_type == 'streak':
-            streak = drops_service.get_user_streak_for_user(user_id=current_user['id'], channel_name=config.channel_name, platform=config.platform, viewer_id=request.viewer_id)
-            if not streak or streak.current_streak < config.streak_days_common:
-                raise HTTPException(status_code=400, detail=f'Insufficient streak for drop. Required at least {config.streak_days_common} days.')
-            if streak.current_streak >= config.streak_days_legendary:
-                quality_name = 'Legendary'
-            elif streak.current_streak >= config.streak_days_epic:
-                quality_name = 'Epic'
-            elif streak.current_streak >= config.streak_days_rare:
-                quality_name = 'Rare'
-            else:
-                quality_name = 'Common'
+            pending_chest = db.query(PendingStreakChest).filter(
+                PendingStreakChest.user_id == current_user['id'],
+                PendingStreakChest.channel_name == config.channel_name,
+                PendingStreakChest.platform == config.platform,
+                PendingStreakChest.viewer_id == request.viewer_id,
+                PendingStreakChest.status == 'pending',
+            ).first()
+            if not pending_chest:
+                pending_chest = db.query(PendingStreakChest).filter(
+                    PendingStreakChest.user_id == current_user['id'],
+                    PendingStreakChest.channel_name == config.channel_name,
+                    PendingStreakChest.viewer_id == request.viewer_id,
+                    PendingStreakChest.status == 'pending',
+                ).order_by(PendingStreakChest.updated_at.desc()).first()
+            if not pending_chest:
+                raise HTTPException(status_code=400, detail='No pending streak chest for this viewer.')
+            quality_name = pending_chest.quality_name
         elif request.drops_type == 'donation':
             if not request.donation_amount:
                 raise HTTPException(status_code=400, detail='Not enough data to open streak drops.')
@@ -173,12 +181,19 @@ async def open_drops(request: DropsOpenRequest, current_user: dict=Depends(get_c
         else:
             raise HTTPException(status_code=400, detail='Unsupported drops type.')
         try:
-            drop_result = calc_service.calculate_drop(user_id=current_user['id'], channel_name=config.channel_name, platform=config.platform, quality_name=quality_name)
+            drop_platform = pending_chest.platform if pending_chest else config.platform
+            drop_result = calc_service.calculate_drop(user_id=current_user['id'], channel_name=config.channel_name, platform=drop_platform, quality_name=quality_name)
         except ValueError as e:
             logger.exception('[ERROR] [DROPS] Failed to calculate drop')
             raise HTTPException(status_code=500, detail='Internal server error.')
         quality = drops_service.get_quality_by_name(quality_name)
-        history_entry = history_repo.create_history_entry(user_id=current_user['id'], channel_name=config.channel_name, platform=config.platform, viewer_id=request.viewer_id, viewer_name=request.viewer_name, lootbox_type=request.drops_type, quality_id=quality.id if quality else None, reward_id=drop_result['reward_id'], reward_name=drop_result['reward_name'], reward_type=drop_result['reward_type'], reward_value=drop_result['reward_value'], donation_amount=request.donation_amount if request.drops_type == 'donation' else None, streak_days=request.streak_days if request.drops_type == 'streak' else None, messages_count=request.messages_count if request.drops_type == 'streak' else None)
+        history_entry = history_repo.create_history_entry(user_id=current_user['id'], channel_name=config.channel_name, platform=pending_chest.platform if pending_chest else config.platform, viewer_id=request.viewer_id, viewer_name=request.viewer_name, lootbox_type=request.drops_type, quality_id=quality.id if quality else None, reward_id=drop_result['reward_id'], reward_name=drop_result['reward_name'], reward_type=drop_result['reward_type'], reward_value=drop_result['reward_value'], donation_amount=request.donation_amount if request.drops_type == 'donation' else None, streak_days=pending_chest.streak_days if pending_chest else (request.streak_days if request.drops_type == 'streak' else None), messages_count=pending_chest.messages_count if pending_chest else (request.messages_count if request.drops_type == 'streak' else None))
+        if pending_chest:
+            pending_chest.status = 'opened'
+            pending_chest.opened_history_id = history_entry.id
+            pending_chest.opened_at = utcnow_naive()
+            pending_chest.updated_at = utcnow_naive()
+            db.commit()
         logger.info(f"[OK] [DROPS] Opened {request.drops_type} lootbox for {request.viewer_name}: {drop_result['reward_name']} ({quality_name})")
         try:
             from services.memory_websocket_manager import get_memory_websocket_manager

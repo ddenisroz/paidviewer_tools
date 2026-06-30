@@ -28,6 +28,10 @@
 
 `raw endpoint` остаётся только compatibility-путём для поддержки. Основной пользовательский self-host сценарий — только через `tts_worker_agent`.
 
+Для локального smoke-профиля `cloud-tts-fake` теперь поднимается лёгкий fake F5 runtime на `8011`, поэтому gateway-путь можно проверять end-to-end без загрузки реальной модели.
+
+Для mixed RU/EN озвучки self-host runtime должен уметь маршрутизировать английский текст на EN-capable или bilingual F5 checkpoint. Один только RU checkpoint уровня `Misha` не даёт качественного произношения английских слов. Если bilingual runtime вынесен отдельно, агент поддерживает отдельный `mixed_language_endpoint_url` для таких заданий.
+
 ## С чего начать
 
 - [Быстрый старт и запуск всего проекта](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md)

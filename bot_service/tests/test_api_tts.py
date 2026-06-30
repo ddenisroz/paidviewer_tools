@@ -2,7 +2,11 @@
 """
 API tests for current TTS routes.
 """
+from unittest.mock import patch
+
+from api.tts import channel_points_routes
 from models.tts import TTSBlockedUser
+from repositories.tts_settings_repository import TTSSettingsRepository
 from services.tts.tts_service import (
     BlockTargetNotFoundError,
     BlockTargetVerificationUnavailableError,
@@ -17,6 +21,14 @@ def _csrf_headers(authenticated_client):
     token = authenticated_client.cookies.get("csrf_token")
     assert token
     return {"X-CSRF-Token": token}
+
+
+class _FakePlatformRewardsService:
+    def __init__(self, rewards):
+        self.rewards = rewards
+
+    async def get_rewards(self, user_id, platform, db):
+        return self.rewards
 
 
 class TestTTSAPI:
@@ -50,6 +62,111 @@ class TestTTSAPI:
         assert response.status_code == 200
         data = response.json()
         assert data.get("success") is True
+
+    def test_attach_tts_reward_succeeds_for_existing_input_reward(
+        self, authenticated_client, db, test_user, monkeypatch
+    ):
+        monkeypatch.setattr(
+            channel_points_routes,
+            "get_platform_rewards_service",
+            lambda: _FakePlatformRewardsService(
+                [
+                    {
+                        "id": "reward-1",
+                        "title": "TTS message",
+                        "cost": 500,
+                        "is_user_input_required": True,
+                    }
+                ]
+            ),
+        )
+
+        response = authenticated_client.post(
+            "/api/tts/rewards/attach",
+            json={"platform": "twitch", "reward_id": "reward-1"},
+            headers=_csrf_headers(authenticated_client),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["platform"] == "twitch"
+        assert payload["reward_id"] == "reward-1"
+        assert payload["reward_title"] == "TTS message"
+
+        settings = TTSSettingsRepository(db).get_or_create(user_id=test_user.id)
+        assert settings.tts_reward_ids["twitch"] == "reward-1"
+
+    def test_attach_tts_reward_returns_404_for_unknown_reward(
+        self, authenticated_client, monkeypatch
+    ):
+        monkeypatch.setattr(
+            channel_points_routes,
+            "get_platform_rewards_service",
+            lambda: _FakePlatformRewardsService(
+                [
+                    {
+                        "id": "reward-1",
+                        "title": "TTS message",
+                        "cost": 500,
+                        "is_user_input_required": True,
+                    }
+                ]
+            ),
+        )
+
+        response = authenticated_client.post(
+            "/api/tts/rewards/attach",
+            json={"platform": "twitch", "reward_id": "missing"},
+            headers=_csrf_headers(authenticated_client),
+        )
+
+        assert response.status_code == 404
+
+    def test_attach_tts_reward_returns_400_without_user_input(
+        self, authenticated_client, monkeypatch
+    ):
+        monkeypatch.setattr(
+            channel_points_routes,
+            "get_platform_rewards_service",
+            lambda: _FakePlatformRewardsService(
+                [
+                    {
+                        "id": "reward-1",
+                        "title": "No input",
+                        "cost": 500,
+                        "is_user_input_required": False,
+                    }
+                ]
+            ),
+        )
+
+        response = authenticated_client.post(
+            "/api/tts/rewards/attach",
+            json={"platform": "twitch", "reward_id": "reward-1"},
+            headers=_csrf_headers(authenticated_client),
+        )
+
+        assert response.status_code == 400
+
+    def test_delete_tts_reward_detaches_without_platform_delete(
+        self, authenticated_client, db, test_user
+    ):
+        repo = TTSSettingsRepository(db)
+        settings = repo.get_or_create(user_id=test_user.id)
+        repo.update_settings(settings, {"tts_reward_ids": {"twitch": "reward-1", "vk": "vk-reward"}})
+
+        with patch("platforms.registry.platform_registry.get") as get_platform:
+            response = authenticated_client.delete(
+                "/api/tts/rewards/twitch",
+                headers=_csrf_headers(authenticated_client),
+            )
+
+        assert response.status_code == 200
+        get_platform.assert_not_called()
+        db.expire_all()
+        settings = repo.get_or_create(user_id=test_user.id)
+        assert settings.tts_reward_ids == {"vk": "vk-reward"}
 
     def test_tts_filtered_words(self, authenticated_client):
         response = authenticated_client.get("/api/tts/filtered-words")

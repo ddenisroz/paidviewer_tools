@@ -27,6 +27,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { formatAppDateTime } from '@/shared/utils/dateTime';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
@@ -590,18 +591,19 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                         const isProcessing = processing.has(demand.id);
                         const userName = demand.user?.nick || demand.user?.name || 'Пользователь';
                         const timestamp = demand.created_at
-                            ? new Date(
+                            ? formatAppDateTime(
                                   typeof demand.created_at === 'number'
                                       ? demand.created_at * 1000
-                                      : new Date(demand.created_at).getTime()
-                              ).toLocaleString('ru-RU', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  second: '2-digit',
-                              })
+                                      : demand.created_at,
+                                  {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      second: '2-digit',
+                                  }
+                              )
                             : 'Неизвестно';
 
                         return (

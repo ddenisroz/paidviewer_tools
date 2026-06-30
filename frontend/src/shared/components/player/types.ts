@@ -1,19 +1,3 @@
-// YouTube iframe player methods used by the app
-export interface ReactPlayerInstance {
-    seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
-    getCurrentTime: () => number;
-    getDuration: () => number;
-    playVideo: () => void;
-    pauseVideo: () => void;
-    setVolume: (volume: number) => void;
-    getVolume?: () => number;
-    isMuted?: () => boolean;
-    mute: () => void;
-    unMute: () => void;
-    loadVideoById: (videoId: string, startSeconds?: number) => void;
-    cueVideoById: (videoId: string, startSeconds?: number) => void;
-}
-
 /**
  * YouTubePlayer interface - matches PlayerContext's YouTubePlayer type
  * This is what gets passed to setPlayerRef in the context

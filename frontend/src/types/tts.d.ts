@@ -62,6 +62,7 @@ export interface TtsSettings {
     enableTwitch?: boolean;
     filterReplies?: boolean;
     filterMentions?: boolean;
+    directInteractionsEnabled?: boolean;
     version?: number;
     platformSettings?: {
         twitch?: TtsPlatformSettings;
@@ -101,6 +102,7 @@ export interface TtsSettings {
     gcloud_mood?: 'neutral' | 'sad' | 'happy';
     filter_replies?: boolean;
     filter_mentions?: boolean;
+    direct_interactions_enabled?: boolean;
     enabled_platforms?: Array<'twitch' | 'vk' | 'youtube'>;
     tts_mode?: 'all_messages' | 'channel_points';
 }
@@ -264,6 +266,24 @@ export interface CreateTtsRewardResponse {
         reward_id?: string;
         message?: string;
     };
+}
+
+/**
+ * Данные для привязки существующей TTS-награды.
+ */
+export interface AttachTtsRewardData {
+    platform: string;
+    reward_id: string;
+}
+
+/**
+ * Ответ при привязке существующей TTS-награды.
+ */
+export interface AttachTtsRewardResponse {
+    success: boolean;
+    platform?: string;
+    reward_id?: string;
+    reward_title?: string;
 }
 
 /**

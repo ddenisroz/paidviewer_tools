@@ -36,8 +36,8 @@ describe('MiniPlayerUI', () => {
             />
         );
 
-        expect(screen.getByText('by yourchy')).toBeInTheDocument();
-        expect(screen.getByText('Paid video')).toBeInTheDocument();
+        expect(screen.getByText('Заказал: yourchy')).toBeInTheDocument();
+        expect(screen.getByText('Платные заказы')).toBeInTheDocument();
         expect(screen.getByText('2:00 / 12:34')).toBeInTheDocument();
     });
 
@@ -69,10 +69,10 @@ describe('MiniPlayerUI', () => {
             />
         );
 
-        expect(screen.getByText('Queue')).toBeInTheDocument();
+        expect(screen.getByText('Очередь')).toBeInTheDocument();
         expect(screen.getByText('Queued Paid')).toBeInTheDocument();
-        expect(screen.getAllByText(/Paid/i).length).toBeGreaterThan(0);
-        fireEvent.click(screen.getByTitle('Hide'));
+        expect(screen.getByText('Платный')).toBeInTheDocument();
+        fireEvent.click(screen.getByTitle('Скрыть'));
     });
 
     it('keeps the sidebar mini-player constrained to the 205x100 docked layout', () => {
@@ -101,9 +101,9 @@ describe('MiniPlayerUI', () => {
 
         expect(variantRoot?.className).toContain('w-full');
         expect(card?.className).toContain('h-[108px]');
-        expect(screen.getByTitle('Close player')).toBeInTheDocument();
-        expect(screen.getByTitle('Next video')).toBeInTheDocument();
-        expect(screen.queryByText('by yourchy')).not.toBeInTheDocument();
+        expect(screen.getByTitle('Скрыть мини-плеер')).toBeInTheDocument();
+        expect(screen.queryByTitle('Следующее видео')).not.toBeInTheDocument();
+        expect(screen.queryByText('Заказал: yourchy')).not.toBeInTheDocument();
         expect(screen.queryByTitle('Play')).not.toBeInTheDocument();
     });
 });

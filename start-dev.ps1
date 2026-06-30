@@ -258,13 +258,13 @@ $selectedServices = @(
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 )
 
-if ($WithCloudTtsReal -and $selectedServices.Count -gt 0) {
+if (($WithCloudTtsFake -or $WithCloudTtsReal) -and $selectedServices.Count -gt 0) {
     $selectedSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($serviceName in $selectedServices) {
         [void]$selectedSet.Add($serviceName)
     }
 
-    $cloudTtsBackends = @("tts_gateway", "tts_service")
+    $cloudTtsBackends = if ($WithCloudTtsFake) { @("tts_gateway", "tts_service_fake") } else { @("tts_gateway", "tts_service") }
     $needsCloudBackends = $selectedSet.Contains("bot_service") -or $selectedSet.Contains("tts_gateway")
 
     if ($needsCloudBackends) {
@@ -357,7 +357,8 @@ Write-Host "[LOG] Mirrored service logs: $((Get-LogMirrorRoot))" -ForegroundColo
 
 if ($WithCloudTtsFake) {
     Write-Host "[TTS] Gateway: http://localhost:8010" -ForegroundColor Cyan
-    Write-Host "[INFO] Fake/light TTS profile does not start the heavy F5 runtime." -ForegroundColor Yellow
+    Write-Host "[TTS] Fake F5 runtime: http://localhost:8011" -ForegroundColor Cyan
+    Write-Host "[INFO] Fake/light TTS profile starts a lightweight smoke runtime without model prewarm." -ForegroundColor Yellow
 } elseif ($WithCloudTtsReal) {
     Write-Host "[TTS] Gateway: http://localhost:8010" -ForegroundColor Cyan
     Write-Host "[TTS] F5 runtime: http://localhost:8011" -ForegroundColor Cyan

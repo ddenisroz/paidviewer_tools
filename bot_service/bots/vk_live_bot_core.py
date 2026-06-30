@@ -309,11 +309,7 @@ class VKLiveBotCore:
                                 )
 
                                 if result:
-                                    logger.info(f"[REWARD] [DROPS VK] {result['viewer_name']} получил {result['reward']} ({result['quality']})")
-
-                                    # Отправляем событие в WebSocket для OBS виджета
-                                    from utils.websocket_helper import broadcast_drops_event
-                                    await broadcast_drops_event(result)
+                                    logger.info("[DROPS VK] %s pending streak chest: %s", result.get("viewer_name"), result.get("quality"))
                             except Exception as drops_err:
                                 logger.debug(f"Could not process streak drops for VK: {drops_err}")
                 finally:

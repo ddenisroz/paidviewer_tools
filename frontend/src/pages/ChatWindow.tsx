@@ -15,6 +15,7 @@ import { chatboxService } from '@/services/api/services/chatboxService';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Input } from '@/shared/components/ui/input';
+import { formatAppTime } from '@/shared/utils/dateTime';
 import { logger } from '@/shared/utils/prodLogger';
 
 import type { ChatMessage } from '@/types/chat';
@@ -663,12 +664,7 @@ const ChatWindow: React.FC = () => {
 
                                     {settings.show_timestamps && (
                                         <span style={{ marginRight: '6px', color: 'rgba(255,255,255,0.45)' }}>
-                                            {msg.timestamp
-                                                ? new Date(msg.timestamp).toLocaleTimeString('ru-RU', {
-                                                      hour: '2-digit',
-                                                      minute: '2-digit',
-                                                  })
-                                                : ''}
+                                            {msg.timestamp ? formatAppTime(msg.timestamp) : ''}
                                         </span>
                                     )}
 

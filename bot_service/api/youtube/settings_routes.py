@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from auth.auth import get_current_user
 from core.database import get_db
 from repositories.tts_settings_repository import TTSSettingsRepository
+from repositories.user_token_repository import UserTokenRepository
 from core.connection_manager import get_connection_manager
 from services.youtube.obs_overlay import build_youtube_obs_state
 from services.youtube.reward_settings import (
@@ -30,6 +31,7 @@ class YouTubeSettingsResponse(BaseModel):
     obs_overlay_mode: Literal['video', 'track'] = Field(default='track', description='OBS overlay display mode')
     volume_level: int = Field(default=100, ge=0, le=100, description='Volume level (0-100)')
     requests_command_enabled: bool = Field(default=True, description='Allow !sr command')
+    request_command_name: str = Field(default='!sr', description='Viewer command for video requests')
 
     # Legacy single-platform reward settings (kept for backward compatibility)
     requests_reward_enabled: bool = Field(default=False, description='Allow reward-based requests')
@@ -41,6 +43,11 @@ class YouTubeSettingsResponse(BaseModel):
     requests_reward_twitch_id: Optional[str] = Field(None, description='Twitch reward ID')
     requests_reward_vk_enabled: bool = Field(default=False, description='Allow VK reward requests')
     requests_reward_vk_id: Optional[str] = Field(None, description='VK reward title')
+    paid_orders_enabled: bool = Field(default=False, description='Allow paid video orders')
+    paid_order_mode: Literal['rub_per_minute', 'full_video'] = Field(default='rub_per_minute', description='Paid order tariff mode')
+    paid_order_rate_rub_per_minute: float = Field(default=0, ge=0, description='RUB per minute paid video tariff')
+    paid_order_min_amount_rub: float = Field(default=0, ge=0, description='Minimum RUB donation for full-video paid order')
+    paid_order_priority_by_amount: bool = Field(default=True, description='Sort paid donation orders by amount')
     donationalerts_video_enabled: bool = Field(default=False, description='Allow DonationAlerts paid video links')
     donationalerts_video_min_amount: float = Field(default=0, ge=0, description='Minimum DonationAlerts amount for paid video')
     donationalerts_video_priority_next: bool = Field(default=True, description='Put paid videos into the next slot')
@@ -53,6 +60,7 @@ class YouTubeSettingsUpdate(BaseModel):
     obs_overlay_mode: Optional[Literal['video', 'track']] = Field(None, description='OBS overlay display mode')
     volume_level: Optional[int] = Field(None, ge=0, le=100, description='Volume level (0-100)')
     requests_command_enabled: Optional[bool] = Field(None, description='Allow !sr command')
+    request_command_name: Optional[str] = Field(None, min_length=1, max_length=32, description='Viewer command for video requests')
 
     # Legacy single-platform reward settings (accepted for compatibility)
     requests_reward_enabled: Optional[bool] = Field(None, description='Allow reward-based requests')
@@ -64,6 +72,11 @@ class YouTubeSettingsUpdate(BaseModel):
     requests_reward_twitch_id: Optional[str] = Field(None, description='Twitch reward ID')
     requests_reward_vk_enabled: Optional[bool] = Field(None, description='Allow VK reward requests')
     requests_reward_vk_id: Optional[str] = Field(None, description='VK reward title')
+    paid_orders_enabled: Optional[bool] = Field(None, description='Allow paid video orders')
+    paid_order_mode: Optional[Literal['rub_per_minute', 'full_video']] = Field(None, description='Paid order tariff mode')
+    paid_order_rate_rub_per_minute: Optional[float] = Field(None, ge=0, description='RUB per minute paid video tariff')
+    paid_order_min_amount_rub: Optional[float] = Field(None, ge=0, description='Minimum RUB donation for full-video paid order')
+    paid_order_priority_by_amount: Optional[bool] = Field(None, description='Sort paid donation orders by amount')
     donationalerts_video_enabled: Optional[bool] = Field(None, description='Allow DonationAlerts paid video links')
     donationalerts_video_min_amount: Optional[float] = Field(None, ge=0, description='Minimum DonationAlerts amount for paid video')
     donationalerts_video_priority_next: Optional[bool] = Field(None, description='Put paid videos into the next slot')
@@ -73,6 +86,12 @@ def _get_youtube_settings_from_tts(tts_settings) -> dict:
 
     youtube_settings = getattr(tts_settings, 'youtube_settings', None) or {}
     return build_youtube_settings_response(youtube_settings)
+
+
+def _wants_paid_orders(update: YouTubeSettingsUpdate) -> bool:
+    """Return True when this update explicitly enables DonationAlerts video orders."""
+
+    return bool(update.paid_orders_enabled is True or update.donationalerts_video_enabled is True)
 
 
 @youtube_settings_router.get('/youtube-settings', response_model=YouTubeSettingsResponse)
@@ -110,6 +129,14 @@ async def save_youtube_settings(
 
         repo = TTSSettingsRepository(db)
         tts_settings = repo.get_or_create(user_id=user_id)
+
+        if _wants_paid_orders(settings):
+            da_token = UserTokenRepository(db).get_active_token(user_id, "donationalerts")
+            if not da_token or not getattr(da_token, "access_token", None):
+                raise HTTPException(
+                    status_code=400,
+                    detail="DonationAlerts integration is required for paid YouTube orders.",
+                )
 
         youtube_settings = apply_youtube_settings_update(
             getattr(tts_settings, 'youtube_settings', None) or {},

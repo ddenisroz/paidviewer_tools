@@ -31,12 +31,18 @@ export const TtsPlayerControls: React.FC<TtsPlayerControlsProps> = ({
     onUnlockAudio,
     onVolumeChange,
 }) => (
-    <Card className="card-glass shrink-0 border-border/70">
-        <CardHeader className="border-b border-white/5 pb-3">
+    <Card
+        className={
+            compact
+                ? 'shrink-0 border-white/6 bg-[#0b0712]/96 shadow-[0_12px_40px_rgba(0,0,0,0.22)]'
+                : 'card-glass shrink-0 border-border/70'
+        }
+    >
+        <CardHeader className={compact ? 'border-b border-white/6 px-3 py-2.5' : 'border-b border-white/5 pb-3'}>
             <div className="flex items-center justify-between gap-3">
-                <CardTitle className="text-base">TTS player</CardTitle>
+                <CardTitle className={compact ? 'text-sm font-bold text-slate-50' : 'text-base'}>Озвучка</CardTitle>
                 <div className={`text-xs font-bold uppercase tracking-wide ${isSocketConnected ? 'text-emerald-300' : 'text-red-300'}`}>
-                    {isSocketConnected ? 'online' : 'offline'}
+                    {isSocketConnected ? 'онлайн' : 'офлайн'}
                 </div>
             </div>
         </CardHeader>
@@ -50,26 +56,26 @@ export const TtsPlayerControls: React.FC<TtsPlayerControlsProps> = ({
             <div className="grid grid-cols-2 gap-2">
                 <Button type="button" variant="secondary" className="h-10" onClick={onStart}>
                     <Play className="mr-2 h-4 w-4" />
-                    Start
+                    Старт
                 </Button>
                 <Button type="button" variant="secondary" className="h-10" onClick={onStop}>
                     <Square className="mr-2 h-4 w-4" />
-                    Stop
+                    Стоп
                 </Button>
                 <Button type="button" variant="secondary" className="h-10" onClick={onSkipCurrent} disabled={!hasItems}>
                     <SkipForward className="mr-2 h-4 w-4" />
-                    Skip
+                    Скип
                 </Button>
                 <Button type="button" variant="destructive" className="h-10" onClick={onClearQueue} disabled={!hasItems}>
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Clear
+                    Очистить
                 </Button>
             </div>
-            <div className="rounded-lg border border-border/70 bg-background/35 px-3 py-2">
+            <div className={compact ? 'rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2' : 'rounded-lg border border-border/70 bg-background/35 px-3 py-2'}>
                 <div className="mb-2 flex items-center justify-between gap-3">
                     <span className="inline-flex items-center gap-2 text-sm font-bold text-foreground">
                         <Volume2 className="h-4 w-4 text-emerald-300" />
-                        Volume
+                        Громкость
                     </span>
                     <span className="text-sm font-bold text-foreground">{websiteVolume}%</span>
                 </div>
@@ -77,7 +83,7 @@ export const TtsPlayerControls: React.FC<TtsPlayerControlsProps> = ({
             </div>
             {!isAudioUnlocked ? (
                 <Button type="button" variant="outline" className="h-10" onClick={onUnlockAudio}>
-                    Unlock audio
+                    Включить звук
                 </Button>
             ) : null}
         </CardContent>

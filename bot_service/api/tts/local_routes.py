@@ -429,16 +429,18 @@ async def test_local_tts_connection(
     db: Session = Depends(get_db),
 ):
     """Test connection to a local provider endpoint."""
-    _ = db
-    _ = user
-
     try:
         resolved_provider = _normalize_local_provider(request.provider)
         provider_contract = _provider_contract(resolved_provider)
         provider_capabilities = get_provider_capabilities(resolved_provider)
+        api_key = request.api_key
+        if not api_key and db is not None and user and user.get("id"):
+            saved_config = LocalTTSRepository(db).get_by_user_id(int(user["id"]), provider=resolved_provider)
+            if saved_config:
+                api_key = saved_config.api_key
         health_result = await check_local_tts_health(
             request.endpoint_url,
-            request.api_key,
+            api_key,
             provider=resolved_provider,
             fetch_status=True,
         )

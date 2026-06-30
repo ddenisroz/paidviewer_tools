@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
-import { CirclePlay, Cloud, Copy, Monitor, Sparkles } from 'lucide-react';
+import { CirclePlay, Cloud, Copy, Info, Monitor, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/context/AuthContext';
@@ -36,6 +36,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { getFrontendBaseUrl } from '@/shared/utils/urlUtils';
 
 import type { ApiResponse } from '@/types';
@@ -62,6 +63,7 @@ interface GcloudVoice {
 interface SettingsState {
     filterReplies: boolean;
     filterMentions: boolean;
+    directInteractionsEnabled: boolean;
     skipCommands: boolean;
     disableVoiceSelection: boolean;
     speakSenderName: boolean;
@@ -109,6 +111,11 @@ const ENGINE_COPY: Record<EngineType, { label: string; icon: React.ElementType }
     f5_local: { label: 'Self-hosted', icon: Monitor },
     gcloud: { label: 'Google Cloud', icon: Sparkles },
 };
+
+const OBS_DOCK_HELP =
+    'В OBS откройте Docks > Custom Browser Docks, задайте название док-панели и вставьте эту ссылку в поле URL.';
+const OBS_AUDIO_HELP =
+    'В OBS добавьте Browser Source, вставьте эту ссылку, включите звук источника и при необходимости мониторинг в Audio Mixer.';
 
 const platformConfig: Array<{ platform: Platform; label: string; Icon: React.ElementType }> = [
     { platform: 'twitch', label: 'Twitch', Icon: TwitchIcon },
@@ -158,7 +165,7 @@ const TtsMainPage: React.FC = () => {
             return payload.data?.voices || payload.voices || [];
         },
     });
-    const { data: obsUrlResponse, refetch: refetchObsUrl } = useQuery<TtsObsLinks>({
+    const { data: obsUrlResponse } = useQuery<TtsObsLinks>({
         queryKey: ['tts', 'obs-url'],
         enabled: Boolean(userId),
         staleTime: 5 * 60 * 1000,
@@ -184,6 +191,7 @@ const TtsMainPage: React.FC = () => {
     const [settingsState, setSettingsState] = useState<SettingsState>({
         filterReplies: false,
         filterMentions: false,
+        directInteractionsEnabled: true,
         skipCommands: true,
         disableVoiceSelection: false,
         speakSenderName: false,
@@ -214,9 +222,16 @@ const TtsMainPage: React.FC = () => {
     useEffect(() => {
         if (!settings) return;
         const maxMessageLength = Math.max(50, Math.min(250, Number(settings.maxMessageLength ?? settings.max_message_length ?? 150)));
+        const filterReplies = Boolean(settings.filterReplies ?? settings.filter_replies ?? false);
+        const filterMentions = Boolean(settings.filterMentions ?? settings.filter_mentions ?? false);
         setSettingsState({
-            filterReplies: Boolean(settings.filterReplies ?? settings.filter_replies ?? false),
-            filterMentions: Boolean(settings.filterMentions ?? settings.filter_mentions ?? false),
+            filterReplies,
+            filterMentions,
+            directInteractionsEnabled: Boolean(
+                settings.directInteractionsEnabled ??
+                    settings.direct_interactions_enabled ??
+                    (!filterReplies && !filterMentions)
+            ),
             skipCommands: Boolean(settings.skipCommands ?? settings.skip_commands ?? true),
             disableVoiceSelection: Boolean(settings.disableVoiceSelection ?? settings.disable_voice_selection ?? false),
             speakSenderName: Boolean(settings.speakSenderName ?? settings.speak_sender_name ?? false),
@@ -256,7 +271,7 @@ const TtsMainPage: React.FC = () => {
     }, [connectedPlatforms, platformSettings]);
 
     const obsStatus = unwrapPayload<ObsStatus>(obsStatusResponse as ApiResponse<ObsStatus> | ObsStatus | undefined) || {};
-    const isSaving = saveSettingsMutation.isPending || savePlatformMutation.isPending || saveModeMutation.isPending;
+    const isModeSaving = saveModeMutation.isPending;
     const isEngineBusy = setEngineMutation.isPending;
     const isEnabled = Boolean(status?.enabled);
     const hasLocalSetup = Boolean(status?.has_local_setup_f5 || status?.has_local_setup);
@@ -277,6 +292,19 @@ const TtsMainPage: React.FC = () => {
         const nextState = { ...settingsState, [key]: value };
         setSettingsState(nextState);
         saveSettingsMutation.mutate({ [key]: value } as Partial<TtsSettings>);
+    };
+
+    const saveDirectInteractions = (enabled: boolean): void => {
+        setSettingsState((prev) => ({
+            ...prev,
+            directInteractionsEnabled: enabled,
+            filterReplies: !enabled,
+            filterMentions: !enabled,
+        }));
+        saveSettingsMutation.mutate({
+            filterReplies: !enabled,
+            filterMentions: !enabled,
+        });
     };
 
     const handleMaxLengthPreviewChange = (value: number): void => {
@@ -316,7 +344,7 @@ const TtsMainPage: React.FC = () => {
     const handleEngineChange = (engine: EngineType): void => {
         if (engine === selectedEngine || isEngineBusy) return;
         if (engine === 'f5_local' && !hasLocalSetup) {
-            toast.error('Сначала настройте локальный F5 на вкладке Self-Host.');
+            toast.error('Сначала настройте Self Hosted TTS.');
             return;
         }
         setSelectedEngine(engine);
@@ -365,16 +393,6 @@ const TtsMainPage: React.FC = () => {
         );
     };
 
-    const handleGenerateObsUrl = async (): Promise<void> => {
-        try {
-            await ttsService.getObsLinks();
-            await refetchObsUrl();
-            toast.success('OBS source создан');
-        } catch {
-            toast.error('Не удалось создать OBS source');
-        }
-    };
-
     const handleCopyUrl = async (url: string): Promise<void> => {
         if (!url) return;
         try {
@@ -388,7 +406,7 @@ const TtsMainPage: React.FC = () => {
     const renderToggle = (label: string, checked: boolean, onChange: (value: boolean) => void) => (
         <div className="flex h-11 items-center justify-between gap-2 rounded-lg border border-border/70 bg-background/35 px-3">
             <span className="text-sm font-bold text-foreground">{label}</span>
-            <Switch checked={checked} onCheckedChange={onChange} disabled={saveSettingsMutation.isPending} />
+            <Switch checked={checked} onCheckedChange={onChange} />
         </div>
     );
 
@@ -414,7 +432,7 @@ const TtsMainPage: React.FC = () => {
                             <TtsChannelPointsMode
                                 ttsMode={ttsMode}
                                 onModeChange={handleModeChange}
-                                isSaving={isSaving}
+                                isSaving={isModeSaving}
                             />
 
                             <div className="grid grid-cols-3 gap-2">
@@ -465,26 +483,64 @@ const TtsMainPage: React.FC = () => {
                             <div className="flex min-h-[112px] flex-1">
                                 {listeningMode === 'obs' ? (
                                     <div className="w-full space-y-2.5 rounded-lg border border-border/70 bg-background/35 p-2.5">
-                                        <div className="flex items-center gap-2">
-                                            <Input value={obsDockUrl || 'OBS dock URL not created'} readOnly className="h-9 min-w-0 font-mono text-xs" />
-                                            {obsDockUrl ? (
-                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsDockUrl)}>
-                                                    <Copy className="h-4 w-4" />
-                                                </Button>
-                                            ) : (
-                                                <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => void handleGenerateObsUrl()}>
-                                                    Create
-                                                </Button>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Input value={obsSourceUrl || 'OBS audio source URL not created'} readOnly className="h-9 min-w-0 font-mono text-xs" />
-                                            {obsSourceUrl ? (
-                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyUrl(obsSourceUrl)}>
-                                                    <Copy className="h-4 w-4" />
-                                                </Button>
-                                            ) : null}
-                                        </div>
+                                        <TooltipProvider delayDuration={150}>
+                                            <div className="space-y-1.5">
+                                                <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                                                    <span>Док-панель OBS</span>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <button type="button" className="rounded-full text-muted-foreground transition-colors hover:text-foreground">
+                                                                <Info className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                                                            {OBS_DOCK_HELP}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Input value={obsDockUrl || 'Ссылка док-панели OBS пока недоступна'} readOnly className="h-9 min-w-0 font-mono text-xs" />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        onClick={() => void handleCopyUrl(obsDockUrl)}
+                                                        aria-label="Скопировать ссылку док-панели OBS"
+                                                        disabled={!obsDockUrl}
+                                                    >
+                                                        <Copy className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                                                    <span>Источник звука OBS</span>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <button type="button" className="rounded-full text-muted-foreground transition-colors hover:text-foreground">
+                                                                <Info className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                                                            {OBS_AUDIO_HELP}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Input value={obsSourceUrl || 'Ссылка источника звука OBS пока недоступна'} readOnly className="h-9 min-w-0 font-mono text-xs" />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        onClick={() => void handleCopyUrl(obsSourceUrl)}
+                                                        aria-label="Скопировать ссылку источника звука OBS"
+                                                        disabled={!obsSourceUrl}
+                                                    >
+                                                        <Copy className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </TooltipProvider>
                                         <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
                                             <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-2.5 py-1">
                                                 <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.dock_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
@@ -587,12 +643,7 @@ const TtsMainPage: React.FC = () => {
                             <CardTitle className="text-base font-bold">Фильтры озвучки</CardTitle>
                         </CardHeader>
                         <CardContent className="grid flex-1 grid-cols-2 content-start gap-2 p-3.5">
-                            {renderToggle('Озвучивать упоминания', !settingsState.filterMentions, (value) =>
-                                saveBoolean('filterMentions', !value)
-                            )}
-                            {renderToggle('Озвучивать ответы', !settingsState.filterReplies, (value) =>
-                                saveBoolean('filterReplies', !value)
-                            )}
+                            {renderToggle('Прямые обращения', settingsState.directInteractionsEnabled, saveDirectInteractions)}
                             {renderToggle('Озвучивать команды', !settingsState.skipCommands, (value) =>
                                 saveBoolean('skipCommands', !value)
                             )}
@@ -614,7 +665,6 @@ const TtsMainPage: React.FC = () => {
                                     step={10}
                                     onValueChange={(values) => handleMaxLengthPreviewChange(values[0])}
                                     onValueCommit={(values) => commitMaxLengthChange(values[0])}
-                                    disabled={saveSettingsMutation.isPending}
                                 />
                             </div>
                         </CardContent>

@@ -57,7 +57,11 @@ def build_adapters(config: AgentConfig):
     adapters = {}
     f5_cfg = config.providers.get("f5")
     if f5_cfg and f5_cfg.enabled and f5_cfg.endpoint_url:
-        adapters["f5"] = F5Adapter(endpoint_url=f5_cfg.endpoint_url, api_key=f5_cfg.api_key)
+        adapters["f5"] = F5Adapter(
+            endpoint_url=f5_cfg.endpoint_url,
+            mixed_language_endpoint_url=f5_cfg.mixed_language_endpoint_url,
+            api_key=f5_cfg.api_key,
+        )
 
     return adapters
 

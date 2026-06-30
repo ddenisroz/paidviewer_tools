@@ -429,7 +429,6 @@ class SessionManager:
                 session = db.query(UserSession).filter_by(session_id=session_id, is_active=True).first()
 
                 if not session:
-                    logger.debug("Invalid or inactive session: %s", mask_session_id(session_id))
                     return None
 
                 # Update last_activity only if more than one hour has passed.

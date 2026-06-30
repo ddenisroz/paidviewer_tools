@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from auth.auth import get_admin_user, get_current_user
 from core.config import settings
 from core.database import get_db
+from repositories.local_tts_repository import LocalTTSRepository
 from services.worker_control.service import (
     WorkerAuthError,
     WorkerConflictError,
@@ -132,6 +133,8 @@ def _build_provisioning_bundle(
     server_base_url: str,
     pairing_payload: dict[str, Any],
     trusted_origins: list[str],
+    provider_endpoint_url: Optional[str] = None,
+    provider_api_key: Optional[str] = None,
 ) -> dict[str, Any]:
     label_hint = str(pairing_payload.get("label_hint") or "").strip() or "My TTS Worker"
 
@@ -153,11 +156,29 @@ def _build_provisioning_bundle(
         "providers": {
             "f5": {
                 "enabled": True,
-                "endpoint_url": _resolve_default_provider_endpoint("f5"),
-                "api_key": "",
+                "endpoint_url": provider_endpoint_url or _resolve_default_provider_endpoint("f5"),
+                "api_key": provider_api_key or "",
             },
         },
     }
+
+
+def _get_saved_provider_runtime_config(
+    *,
+    db: Session,
+    user_id: int,
+    provider: str,
+) -> tuple[Optional[str], Optional[str]]:
+    try:
+        config = LocalTTSRepository(db).get_by_user_id(user_id, provider=provider)
+    except Exception:
+        logger.exception("Failed to read saved %s local runtime config for provisioning", provider)
+        return None, None
+    if not config:
+        return None, None
+    endpoint_url = str(getattr(config, "endpoint_url", "") or "").strip() or None
+    api_key = str(getattr(config, "api_key", "") or "").strip() or None
+    return endpoint_url, api_key
 
 
 def _build_provisioning_filename(provider_hint: Optional[str]) -> str:
@@ -273,6 +294,7 @@ async def create_worker_provisioning_bundle(
     request: PairingTokenRequest,
     http_request: Request,
     user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
     service: WorkerControlPlaneService = Depends(get_worker_control_service),
 ):
     try:
@@ -284,10 +306,17 @@ async def create_worker_provisioning_bundle(
         )
         server_base_url = _resolve_server_base_url(http_request)
         trusted_origins = _resolve_trusted_origins(http_request, server_base_url)
+        provider_endpoint_url, provider_api_key = _get_saved_provider_runtime_config(
+            db=db,
+            user_id=int(user["id"]),
+            provider="f5",
+        )
         provisioning_bundle = _build_provisioning_bundle(
             server_base_url=server_base_url,
             pairing_payload=pairing_payload,
             trusted_origins=trusted_origins,
+            provider_endpoint_url=provider_endpoint_url,
+            provider_api_key=provider_api_key,
         )
         return {
             "success": True,

@@ -58,16 +58,16 @@ export function LocalTtsConnectionGuide({
         action?: React.ReactNode;
     }> = [
         {
-            title: '1. Установите локальную программу',
+            title: '1. Установите Self Hosted программу',
             state: agent.state,
             tone: agent.tone,
             icon: <Plug className="h-4 w-4" weight="duotone" />,
             body: (
                 <>
                     Она работает на вашем компьютере и связывает сайт с голосовым сервисом. Откройте инструкцию,
-                    скачайте программу и запустите ее рядом с проектом.
+                    скачайте Self Hosted пакет и запустите его рядом с проектом.
                     <div className="mt-2 flex flex-wrap gap-2">
-                        <GuideLink href={workerRepoUrl}>Локальная программа</GuideLink>
+                        <GuideLink href={workerRepoUrl}>Self Hosted программа</GuideLink>
                         {runtimeRepoUrl ? (
                             <GuideLink href={runtimeRepoUrl}>Документация {providerLabel}</GuideLink>
                         ) : null}
@@ -86,7 +86,7 @@ export function LocalTtsConnectionGuide({
                     Передать настройки
                 </Button>
             ),
-            body: 'Кнопка передает сайту и локальной программе один набор настроек. Если программа еще не отвечает, файл скачивается и подхватывается при следующем запуске.',
+            body: 'Кнопка передает сайту и Self Hosted программе один набор настроек. Если программа еще не отвечает, файл скачивается и подхватывается при следующем запуске.',
         },
         {
             title: `3. Проверьте ${providerLabel}`,
@@ -99,7 +99,7 @@ export function LocalTtsConnectionGuide({
                     Проверить сервис
                 </Button>
             ),
-            body: `Проверка показывает, отвечает ли выбранный голосовой сервис. Если статус не отвечает, запустите ${providerLabel} локально и повторите проверку.`,
+            body: `Проверка показывает, отвечает ли выбранный голосовой сервис. Если статус не отвечает, запустите ${providerLabel} в Self Hosted режиме и повторите проверку.`,
         },
         {
             title: '4. Откройте голоса',
@@ -130,13 +130,13 @@ export function LocalTtsConnectionGuide({
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-base font-semibold text-foreground">Подключение локального TTS</h2>
+                        <h2 className="text-base font-semibold text-foreground">Подключение Self Hosted TTS</h2>
                         <Badge variant="outline" className="border-blue-500/35 bg-blue-500/10 text-blue-200">
                             {providerLabel}
                         </Badge>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Сайт отправляет задачу вашей локальной программе, а голосовой сервис создает звук на этом
+                        Сайт отправляет задачу вашей Self Hosted программе, а голосовой сервис создает звук на этом
                         компьютере.
                     </p>
                 </div>

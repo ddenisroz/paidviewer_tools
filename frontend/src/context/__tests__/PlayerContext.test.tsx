@@ -136,6 +136,25 @@ describe('PlayerContext', () => {
         expect(screen.getByTestId('user-paused')).toHaveTextContent('false');
     });
 
+    it('latches native iframe pauses as user pauses', () => {
+        renderPlayerProvider();
+        const mockPlayer = createMockPlayer();
+
+        act(() => {
+            latestContext?.setPlayerRef(mockPlayer);
+        });
+
+        act(() => {
+            latestContext?.handlePlayerStateChange({ data: 1, target: mockPlayer });
+        });
+
+        act(() => {
+            latestContext?.handlePlayerStateChange({ data: 2, target: mockPlayer });
+        });
+
+        expect(screen.getByTestId('user-paused')).toHaveTextContent('true');
+    });
+
     it('keeps userPaused for explicit user pause events', () => {
         renderPlayerProvider();
         const mockPlayer = createMockPlayer();
@@ -160,7 +179,7 @@ describe('PlayerContext', () => {
         expect(screen.getByTestId('user-paused')).toHaveTextContent('true');
     });
 
-    it('syncs volume, minimized state, and remote play intent via storage events', () => {
+    it('syncs volume and remote play intent via storage events without persisting mini-player state', () => {
         renderPlayerProvider();
         const mockPlayer = createMockPlayer();
 
@@ -179,16 +198,7 @@ describe('PlayerContext', () => {
 
         expect(screen.getByTestId('volume')).toHaveTextContent('42');
 
-        act(() => {
-            window.dispatchEvent(
-                new StorageEvent('storage', {
-                    key: 'yt_player_minimized',
-                    newValue: '1',
-                })
-            );
-        });
-
-        expect(screen.getByTestId('minimized')).toHaveTextContent('true');
+        expect(screen.getByTestId('minimized')).toHaveTextContent('false');
 
         act(() => {
             window.dispatchEvent(

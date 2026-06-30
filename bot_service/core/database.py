@@ -66,6 +66,7 @@ from models import (
     DropsHistory,
     MemeAlertsGrantHistory,
     MythicalDropsSession,
+    PendingStreakChest,
     StreamSession,
     # Gamification
     Achievement,
@@ -136,6 +137,7 @@ __all__ = [
     "DropsHistory",
     "MemeAlertsGrantHistory",
     "MythicalDropsSession",
+    "PendingStreakChest",
     "StreamSession",
     # Gamification
     "Achievement",

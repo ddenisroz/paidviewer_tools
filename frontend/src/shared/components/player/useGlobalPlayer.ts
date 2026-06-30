@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import { logger } from '@/shared/utils/prodLogger';
 
-import type { DisplayVideo, ReactPlayerInstance, YouTubePlayer } from './types';
+import type { DisplayVideo, YouTubePlayer } from './types';
 
 interface UseGlobalPlayerOptions {
     displayVideo: DisplayVideo | null;
@@ -23,7 +23,7 @@ export function useGlobalPlayer({
     handlePlayerError,
     nextVideo,
 }: UseGlobalPlayerOptions) {
-    const playerRef = useRef<ReactPlayerInstance | null>(null);
+    const playerRef = useRef<YouTubePlayer | null>(null);
     const endedVideoKeyRef = useRef<string | number | null>(null);
 
     // Sync playback time with server
@@ -90,29 +90,13 @@ export function useGlobalPlayer({
             if (!event?.target || typeof event.data !== 'number') {
                 return;
             }
+            if (event.data === 0) {
+                handleEnded();
+                return;
+            }
             handlePlayerStateChange(event);
         },
-        [handlePlayerStateChange]
-    );
-
-    const handleApiPlay = useCallback(
-        (event?: { target: YouTubePlayer }) => {
-            if (!event?.target) {
-                return;
-            }
-            handlePlayerStateChange({ data: 1, target: event.target });
-        },
-        [handlePlayerStateChange]
-    );
-
-    const handleApiPause = useCallback(
-        (event?: { target: YouTubePlayer }) => {
-            if (!event?.target) {
-                return;
-            }
-            handlePlayerStateChange({ data: 2, target: event.target });
-        },
-        [handlePlayerStateChange]
+        [handleEnded, handlePlayerStateChange]
     );
 
     return {
@@ -121,7 +105,5 @@ export function useGlobalPlayer({
         handleEnded,
         handleError,
         handleStateChange,
-        handleApiPlay,
-        handleApiPause,
     };
 }

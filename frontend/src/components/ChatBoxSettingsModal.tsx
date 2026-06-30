@@ -181,7 +181,11 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         try {
             setSaving(true);
             const response = (await chatboxService.saveSettings(
-                { ...settings, version: settings.version || 1 },
+                {
+                    ...settings,
+                    text_stroke_width: Math.round(Number(settings.text_stroke_width) || 0),
+                    version: settings.version || 1,
+                },
                 regenerateToken
             )) as AxiosResponse<ApiResponse<ChatBoxSettings>>;
             const updatedSettings = extractSettingsFromResponse(response);
@@ -192,7 +196,14 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
             if (onSave) onSave(updatedSettings);
         } catch (error) {
             logger.error('Ошибка сохранения настроек:', error);
-            toast.error('Ошибка сохранения настроек');
+            const detail =
+                typeof error === 'object' &&
+                error !== null &&
+                'response' in error &&
+                typeof (error as { response?: { data?: { detail?: unknown } } }).response?.data?.detail === 'string'
+                    ? (error as { response: { data: { detail: string } } }).response.data.detail
+                    : 'Ошибка сохранения настроек';
+            toast.error(detail);
         } finally {
             setSaving(false);
         }
@@ -502,7 +513,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                     onChange={(v) => handleChange('text_stroke_width', v)}
                                                     min={0}
                                                     max={3}
-                                                    step={0.5}
+                                                    step={1}
                                                     unit="px"
                                                     inputWidth={56}
                                                     inputClassName="text-sm"

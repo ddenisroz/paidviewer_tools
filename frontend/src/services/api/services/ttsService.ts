@@ -243,10 +243,7 @@ export const ttsService = {
      * @param userId - ID пользователя
      * @returns Promise с ответом API
      */
-    async getUserVoices(
-        userId: number,
-        provider: 'f5' = 'f5'
-    ): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> {
+    async getUserVoices(userId: number, provider: 'f5' = 'f5'): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> {
         return apiClient.get(`/api/user/voices/${userId}`, { params: { provider } });
     },
 
@@ -286,10 +283,7 @@ export const ttsService = {
      * @param formData - FormData с файлом голоса
      * @returns Promise с ответом API
      */
-    async uploadVoice(
-        formData: FormData,
-        provider: 'f5' = 'f5'
-    ): Promise<AxiosResponse<ApiResponse<TtsVoice>>> {
+    async uploadVoice(formData: FormData, provider: 'f5' = 'f5'): Promise<AxiosResponse<ApiResponse<TtsVoice>>> {
         return apiClient.post('/api/voices/admin/upload', formData, {
             params: { provider },
             headers: {
@@ -304,11 +298,7 @@ export const ttsService = {
      * @param userId - ID пользователя
      * @returns Promise с ответом API
      */
-    async deleteUserVoice(
-        voiceId: string,
-        userId: number,
-        provider: 'f5' = 'f5'
-    ): Promise<AxiosResponse<ApiResponse>> {
+    async deleteUserVoice(voiceId: string, userId: number, provider: 'f5' = 'f5'): Promise<AxiosResponse<ApiResponse>> {
         return apiClient.delete(`/api/voices/user/custom/${voiceId}`, {
             params: { user_id: userId, provider },
         });
@@ -334,7 +324,16 @@ export const ttsService = {
         cost: number;
         cooldown: number;
     }): Promise<AxiosResponse<ApiResponse>> {
-        return apiClient.post('/api/tts/create-reward', data);
+        return apiClient.post('/api/tts/rewards/create', data);
+    },
+
+    /**
+     * Привязать существующую TTS награду платформы
+     * @param data - Платформа и ID существующей награды
+     * @returns Promise с ответом API
+     */
+    async attachTtsReward(data: { platform: string; reward_id: string }): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.post('/api/tts/rewards/attach', data);
     },
 
     /**
@@ -343,7 +342,7 @@ export const ttsService = {
      * @returns Promise с ответом API
      */
     async deleteTtsReward(platform: string): Promise<AxiosResponse<ApiResponse>> {
-        return apiClient.delete(`/api/tts/reward/${platform}`);
+        return apiClient.delete(`/api/tts/rewards/${platform}`);
     },
 
     /**
@@ -493,6 +492,14 @@ export const ttsService = {
         return apiClient.post('/api/tts/workers/pairing-tokens', payload);
     },
 
+    async disableWorkerAgent(workerKey: string): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.post(`/api/tts/workers/${encodeURIComponent(workerKey)}/disable`);
+    },
+
+    async deleteWorkerAgent(workerKey: string): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.delete(`/api/tts/workers/${encodeURIComponent(workerKey)}`);
+    },
+
     /**
      * Получить статус whitelist
      * @returns Promise с ответом API
@@ -506,10 +513,7 @@ export const ttsService = {
      * @param userId - ID пользователя
      * @returns Promise с ответом API
      */
-    async getEnabledVoices(
-        userId: number,
-        provider: 'f5' = 'f5'
-    ): Promise<AxiosResponse<ApiResponse<number[]>>> {
+    async getEnabledVoices(userId: number, provider: 'f5' = 'f5'): Promise<AxiosResponse<ApiResponse<number[]>>> {
         return apiClient.get(`/api/user/voices/enabled/${userId}`, { params: { provider } });
     },
 

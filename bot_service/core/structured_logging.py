@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict
 
@@ -87,6 +88,41 @@ class SensitiveDataFilter(logging.Filter):
         except Exception:
             # Never block logging because of redaction errors.
             return True
+        return True
+
+
+class RepeatedNoiseFilter(logging.Filter):
+    """Throttle known duplicate third-party log records that can flood local logs."""
+
+    def __init__(self, throttle_seconds: int | None = None) -> None:
+        super().__init__()
+        if throttle_seconds is None:
+            raw_value = os.getenv("NOISY_LOG_THROTTLE_SECONDS", "300")
+            try:
+                throttle_seconds = int(raw_value)
+            except ValueError:
+                throttle_seconds = 300
+
+        self.throttle_seconds = max(0, throttle_seconds)
+        self._last_seen: dict[tuple[str, str], float] = {}
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
+        if self.throttle_seconds <= 0:
+            return True
+
+        try:
+            message = record.getMessage()
+        except Exception:
+            return True
+
+        if record.name == "twitchio.websocket" and message == "Websocket connection was closed: None":
+            key = (record.name, message)
+            now = time.monotonic()
+            last_seen = self._last_seen.get(key)
+            if last_seen is not None and now - last_seen < self.throttle_seconds:
+                return False
+            self._last_seen[key] = now
+
         return True
 
 
@@ -243,6 +279,7 @@ def _create_file_log_handler(log_file: Path, file_log_level: int) -> logging.Han
     handler.setFormatter(formatter)
     handler.setLevel(file_log_level)
     handler.addFilter(SensitiveDataFilter())
+    handler.addFilter(RepeatedNoiseFilter())
     return handler
 
 
@@ -333,6 +370,7 @@ def setup_structured_logging():
     console_handler.setLevel(log_level)
     console_handler.setFormatter(console_formatter)
     console_handler.addFilter(SensitiveDataFilter())
+    console_handler.addFilter(RepeatedNoiseFilter())
     root_logger.addHandler(console_handler)
     
     # Redirect warnings to logging

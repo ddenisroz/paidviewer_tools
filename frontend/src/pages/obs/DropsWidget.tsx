@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useLocation, useParams } from 'react-router-dom';
 
@@ -65,8 +65,13 @@ interface WidgetConfigData {
     widget_opening_duration_ms?: number;
     widget_result_duration_ms?: number;
     widget_spin_sound_file?: string | null;
+    widget_start_sound_file?: string | null;
     widget_reveal_sound_file?: string | null;
     widget_sound_volume?: number;
+    widget_frame_color?: string | null;
+    widget_text_color?: string | null;
+    widget_background_color?: string | null;
+    widget_font_scale?: number | null;
 }
 
 interface DropsApiResponse<T = unknown> {
@@ -88,8 +93,13 @@ interface WidgetConfig {
     opening_duration: number;
     result_duration: number;
     spin_sound_file?: string | null;
+    start_sound_file?: string | null;
     reveal_sound_file?: string | null;
     sound_volume: number;
+    frame_color: string;
+    text_color: string;
+    background_color: string;
+    font_scale: number;
 }
 
 const CARD_WIDTH = 184;
@@ -131,8 +141,13 @@ const DropsWidget: React.FC = () => {
         opening_duration: 700,
         result_duration: 5000,
         spin_sound_file: null,
+        start_sound_file: null,
         reveal_sound_file: null,
         sound_volume: 1,
+        frame_color: '#ff8a00',
+        text_color: '#ffffff',
+        background_color: '#120821',
+        font_scale: 1,
     });
     const channelNameRef = useRef<string | null>(null);
     const platformRef = useRef<string | null>(null);
@@ -146,7 +161,8 @@ const DropsWidget: React.FC = () => {
     const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
     const isPreviewMode = searchParams.get('preview') === 'true';
     const previewQuality = (searchParams.get('quality') || '').toLowerCase();
-    const idleBackground = searchParams.get('background') === 'green' ? 'bg-[#00ff00]' : 'bg-transparent';
+    const previewRun = searchParams.get('run') || '';
+    const idleBackground = searchParams.get('background') === 'transparent' ? 'bg-transparent' : 'bg-[#00ff00]';
 
     const clearAnimations = useCallback(() => {
         if (animationFrameRef.current !== null) {
@@ -164,6 +180,10 @@ const DropsWidget: React.FC = () => {
             timerIntervalRef.current = null;
         }
     }, []);
+
+    useEffect(() => {
+        return () => clearAnimations();
+    }, [clearAnimations]);
 
     const startMythicalTimer = useCallback(
         (seconds: number) => {
@@ -197,8 +217,13 @@ const DropsWidget: React.FC = () => {
         audio.play().catch((error) => logger.error('Error playing reward sound:', error));
     }, []);
 
-    const playWidgetSound = useCallback((kind: 'spin' | 'reveal'): void => {
-        const source = kind === 'spin' ? widgetConfig.current.spin_sound_file : widgetConfig.current.reveal_sound_file;
+    const playWidgetSound = useCallback((kind: 'spin' | 'start' | 'reveal'): void => {
+        const source =
+            kind === 'spin'
+                ? widgetConfig.current.spin_sound_file
+                : kind === 'start'
+                  ? widgetConfig.current.start_sound_file
+                  : widgetConfig.current.reveal_sound_file;
         if (!source) return;
         const audio = new Audio(resolveAudioUrl(source));
         audio.volume = clamp(widgetConfig.current.sound_volume ?? 1, 0, 1);
@@ -335,6 +360,7 @@ const DropsWidget: React.FC = () => {
             setReelItems(strip);
             setPointerKick(false);
             setPhase('opening');
+            playWidgetSound('start');
 
             const targetOffset = WINNER_SLOT_INDEX * CARD_STEP;
 
@@ -435,8 +461,13 @@ const DropsWidget: React.FC = () => {
                         opening_duration: configData.data.widget_opening_duration_ms || 700,
                         result_duration: configData.data.widget_result_duration_ms || 5000,
                         spin_sound_file: configData.data.widget_spin_sound_file || null,
+                        start_sound_file: configData.data.widget_start_sound_file || null,
                         reveal_sound_file: configData.data.widget_reveal_sound_file || null,
                         sound_volume: clamp(configData.data.widget_sound_volume ?? 1, 0, 1),
+                        frame_color: String(configData.data.widget_frame_color || '#ff8a00'),
+                        text_color: String(configData.data.widget_text_color || '#ffffff'),
+                        background_color: String(configData.data.widget_background_color || '#120821'),
+                        font_scale: clamp(Number(configData.data.widget_font_scale ?? 1), 0.8, 1.6),
                     };
                 }
             } catch (error) {
@@ -451,7 +482,13 @@ const DropsWidget: React.FC = () => {
 
     useEffect(() => {
         autoPreviewStartedRef.current = false;
-    }, [isPreviewMode, previewQuality, token]);
+        clearAnimations();
+        setCurrentReward(null);
+        setReelItems([]);
+        setPhase('idle');
+        setTranslateX('translate3d(0px, 0, 0)');
+        setPointerKick(false);
+    }, [clearAnimations, isPreviewMode, previewQuality, previewRun, token]);
 
     useEffect(() => {
         if (!token) {
@@ -472,6 +509,10 @@ const DropsWidget: React.FC = () => {
 
                 if (isPreviewMode) {
                     if (isMounted) setStatus('Тест сундуков');
+                    if (PREVIEW_QUALITIES.has(previewQuality) && previewRun && !autoPreviewStartedRef.current) {
+                        autoPreviewStartedRef.current = true;
+                        void triggerPreviewChest(previewQuality);
+                    }
                     return;
                 }
 
@@ -536,21 +577,34 @@ const DropsWidget: React.FC = () => {
             if (ws.current) ws.current.close();
             if (mythicalIntervalRef.current !== null) window.clearInterval(mythicalIntervalRef.current);
             clearMythicalTimer();
-            clearAnimations();
         };
-    }, [clearAnimations, clearMythicalTimer, isPreviewMode, loadMythicalSession, resolveWidgetContext, runRewardAnimation, token]);
+    }, [
+        clearMythicalTimer,
+        isPreviewMode,
+        loadMythicalSession,
+        previewQuality,
+        previewRun,
+        resolveWidgetContext,
+        runRewardAnimation,
+        token,
+        triggerPreviewChest,
+    ]);
 
     const currentQuality = (currentReward?.quality || currentReward?.quality_name || 'common').toLowerCase();
+    const widgetFrameColor = widgetConfig.current.frame_color || '#ff8a00';
+    const widgetTextColor = widgetConfig.current.text_color || '#ffffff';
+    const widgetBackgroundColor = widgetConfig.current.background_color || '#120821';
+    const widgetFontScale = widgetConfig.current.font_scale || 1;
     useEffect(() => {
         if (!isPreviewMode || autoPreviewStartedRef.current || phase !== 'idle') return;
-        if (!PREVIEW_QUALITIES.has(previewQuality)) return;
+        if (!PREVIEW_QUALITIES.has(previewQuality) || !previewRun) return;
 
         const timer = window.setTimeout(() => {
             autoPreviewStartedRef.current = true;
             void triggerPreviewChest(previewQuality);
         }, 350);
         return () => window.clearTimeout(timer);
-    }, [isPreviewMode, phase, previewQuality, triggerPreviewChest]);
+    }, [isPreviewMode, phase, previewQuality, previewRun, triggerPreviewChest]);
 
     if (mythicalSession && mythicalTimer !== null && mythicalTimer > 0) {
         return (
@@ -579,22 +633,36 @@ const DropsWidget: React.FC = () => {
                         70% { transform: translateX(-50%) rotate(-7deg); }
                     }
                     @keyframes dropsChestPulse {
-                        0%, 100% { transform: translateX(-50%) scale(1); filter: brightness(1); }
-                        50% { transform: translateX(-50%) scale(1.035); filter: brightness(1.12); }
+                        0%, 100% { transform: translateX(-50%); filter: brightness(1); }
+                        50% { transform: translateX(-50%); filter: brightness(1.16) drop-shadow(0 0 18px rgba(255,255,255,0.28)); }
+                    }
+                    @keyframes dropsWinnerPulse {
+                        0%, 100% { filter: brightness(1); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 0 rgba(255,255,255,0); }
+                        50% { filter: brightness(1.18); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.55), 0 0 24px rgba(217,70,239,0.42); }
                     }
                 `}
             </style>
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
                 <div className="relative mx-auto w-full max-w-[1120px] px-8">
                     <div
-                        className={`pointer-events-none absolute left-1/2 top-[224px] z-40 h-0 w-0 -translate-x-1/2 border-l-[18px] border-r-[18px] border-t-[26px] border-l-transparent border-r-transparent border-t-amber-300 drop-shadow-[0_8px_16px_rgba(251,191,36,0.62)] ${
+                        className={`pointer-events-none absolute left-1/2 top-[224px] z-40 h-0 w-0 -translate-x-1/2 border-l-[18px] border-r-[18px] border-t-[26px] border-l-transparent border-r-transparent ${
                             pointerKick ? '[animation:dropsPointerTick_120ms_ease-out]' : ''
                         }`}
+                        style={{ borderTopColor: widgetFrameColor }}
                     />
-                    <div className="pointer-events-none absolute left-1/2 top-[250px] z-30 h-[170px] w-[3px] -translate-x-1/2 bg-gradient-to-b from-amber-200 via-amber-300 to-transparent opacity-80" />
+                    <div
+                        className="pointer-events-none absolute left-1/2 top-[250px] z-30 h-[170px] w-[3px] -translate-x-1/2 opacity-80"
+                        style={{
+                            background: `linear-gradient(to bottom, ${widgetFrameColor}, ${widgetFrameColor}, transparent)`,
+                        }}
+                    />
 
                     {phase === 'opening' ? (
-                        <DropsWidgetOpeningStage quality={currentQuality} viewerName={currentReward.viewer_name} />
+                        <DropsWidgetOpeningStage
+                            quality={currentQuality}
+                            viewerName={currentReward.viewer_name}
+                            frameColor={widgetFrameColor}
+                        />
                     ) : (
                         <DropsWidgetReelStage
                             phase={phase}
@@ -602,10 +670,21 @@ const DropsWidget: React.FC = () => {
                             reelItems={reelItems}
                             translateX={translateX}
                             winnerSlotIndex={WINNER_SLOT_INDEX}
+                            frameColor={widgetFrameColor}
+                            textColor={widgetTextColor}
+                            backgroundColor={widgetBackgroundColor}
+                            fontScale={widgetFontScale}
                         />
                     )}
 
-                    {phase === 'result' ? <DropsWidgetResultPanel reward={currentReward} quality={currentQuality} /> : null}
+                    {phase === 'result' ? (
+                        <DropsWidgetResultPanel
+                            reward={currentReward}
+                            quality={currentQuality}
+                            textColor={widgetTextColor}
+                            fontScale={widgetFontScale}
+                        />
+                    ) : null}
                 </div>
             </div>
 

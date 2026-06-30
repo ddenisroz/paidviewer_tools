@@ -403,8 +403,12 @@ class TTSService:
                 from services.memory_websocket_manager import get_memory_websocket_manager
                 await get_memory_websocket_manager().sync_user_tts_generation(user_id)
             
-            # Version is auto-incremented inside update_settings
-            return {"success": True, "version": getattr(updated_settings, 'version', 1)}
+            # Version is auto-incremented inside update_settings. Return the full
+            # normalized settings payload so frontend caches do not collapse to a
+            # short {success, version} response after autosave.
+            settings_payload = self.settings_repo.get_settings_dict(updated_settings)
+            settings_payload["version"] = getattr(updated_settings, 'version', settings_payload.get("version", 1))
+            return {"success": True, "data": settings_payload, "version": settings_payload["version"]}
         
         except Exception:
             logger.exception("Error saving TTS settings")

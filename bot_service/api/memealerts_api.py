@@ -190,6 +190,13 @@ class CreatePointsRewardRequest(BaseModel):
     cooldown_seconds: int = Field(default=0, ge=0, le=86_400)
 
 
+class AttachPointsRewardRequest(BaseModel):
+    local_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    platform: Literal["twitch", "vk"]
+    reward_id: str = Field(min_length=1, max_length=128)
+    coins_amount: int = Field(default=10, ge=1, le=1_000_000)
+
+
 class TogglePointsRewardRequest(BaseModel):
     enabled: bool
 
@@ -391,6 +398,33 @@ async def create_memealerts_points_reward(
         raise
     except Exception as exc:
         logger.exception("Error creating MemeAlerts points reward")
+        raise HTTPException(status_code=500, detail=str(exc) or "Internal server error")
+
+
+@router.post("/rewards/attach")
+async def attach_memealerts_points_reward(
+    payload: AttachPointsRewardRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Attach an existing Twitch/VK reward that grants MemeCoins by supporter nickname."""
+    try:
+        user_id = user.get("id")
+        service = MemeAlertsService(db)
+        result = await service.attach_points_reward(
+            user_id=user_id,
+            local_id=payload.local_id,
+            platform=payload.platform,
+            reward_id=payload.reward_id,
+            coins_amount=payload.coins_amount,
+        )
+        return {"success": True, "data": result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc) or "Invalid reward parameters")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Error attaching MemeAlerts points reward")
         raise HTTPException(status_code=500, detail=str(exc) or "Internal server error")
 
 

@@ -13,8 +13,23 @@ from core.user_cache import user_cache
 logger = logging.getLogger(__name__)
 
 
+def _is_public_token_request(request: Request) -> bool:
+    path = request.url.path or ""
+    query = request.query_params
+    public_token_routes = (
+        ("/api/drops/", "widget_token"),
+        ("/api/chatbox/", "token"),
+        ("/api/youtube/", "token"),
+        ("/api/tts/", "dock_token"),
+        ("/api/tts/", "obs_token"),
+    )
+    return any(path.startswith(prefix) and query.get(param) for prefix, param in public_token_routes)
+
+
 def get_session_data(request: Request) -> Optional[Dict[str, Any]]:
     """Extract and validate session data from the session cookie."""
+    if _is_public_token_request(request):
+        return None
     session_id = request.cookies.get("session_id")
     if not session_id:
         return None
@@ -86,6 +101,10 @@ async def get_current_user_optional(request: Request, db: Session = Depends(get_
     """Return the authenticated user if a valid session exists, otherwise `None`."""
     if hasattr(request.state, "current_user_optional"):
         return request.state.current_user_optional
+
+    if request.query_params.get("widget_token") and request.url.path.startswith("/api/drops/"):
+        request.state.current_user_optional = None
+        return None
 
     session_data = get_session_data(request)
     if not session_data:

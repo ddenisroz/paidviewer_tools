@@ -18,8 +18,10 @@ import {
 interface MemeAlertsHistoryCardProps {
     historyRows: MemeAlertsHistoryItem[];
     historyLoading: boolean;
+    historyError?: string | null;
     balanceRows: MemeAlertsBalanceItem[];
     balancesLoading: boolean;
+    balancesError?: string | null;
     onRefreshHistory: () => void;
     onRefreshBalances: () => void;
 }
@@ -27,15 +29,17 @@ interface MemeAlertsHistoryCardProps {
 export const MemeAlertsHistoryCard: React.FC<MemeAlertsHistoryCardProps> = ({
     historyRows,
     historyLoading,
+    historyError,
     balanceRows,
     balancesLoading,
+    balancesError,
     onRefreshHistory,
     onRefreshBalances,
 }) => {
     const [activeTab, setActiveTab] = React.useState<'history' | 'balances'>('history');
     const loading = activeTab === 'history' ? historyLoading : balancesLoading;
 
-    const refreshActiveTab = () => {
+    const refreshActiveTab = (): void => {
         if (activeTab === 'history') {
             onRefreshHistory();
             return;
@@ -81,16 +85,20 @@ export const MemeAlertsHistoryCard: React.FC<MemeAlertsHistoryCardProps> = ({
                             value="balances"
                             className="rounded-sm text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white"
                         >
-                            Баланс
+                            Балансы
                         </TabsTrigger>
                     </TabsList>
                 </CardHeader>
 
                 <CardContent className="min-h-0 flex-1 pt-0">
                     <TabsContent value="history" className="mt-0 h-full space-y-1.5 overflow-y-auto pr-1">
-                        {historyRows.length === 0 ? (
+                        {historyError ? (
+                            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-4 text-xs text-red-200">
+                                {historyError}
+                            </p>
+                        ) : historyRows.length === 0 ? (
                             <p className="rounded-lg border border-border/70 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
-                                История пока пустая.
+                                История MemeAlerts пока пустая.
                             </p>
                         ) : (
                             historyRows.map((item, index) => (
@@ -100,7 +108,11 @@ export const MemeAlertsHistoryCard: React.FC<MemeAlertsHistoryCardProps> = ({
                     </TabsContent>
 
                     <TabsContent value="balances" className="mt-0 h-full space-y-1.5 overflow-y-auto pr-1">
-                        {balanceRows.length === 0 ? (
+                        {balancesError ? (
+                            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-4 text-xs text-red-200">
+                                {balancesError}
+                            </p>
+                        ) : balanceRows.length === 0 ? (
                             <p className="rounded-lg border border-border/70 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
                                 MemeAlerts пока не вернул список балансов.
                             </p>
@@ -133,13 +145,15 @@ const MemeAlertsHistoryRow: React.FC<{ item: MemeAlertsHistoryItem }> = ({ item 
     return (
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-lg border border-border/70 bg-card/70 px-3 py-2">
             <div className="min-w-0">
-                {showPrimaryName ? <p className="truncate text-sm font-semibold text-foreground">{primaryName}</p> : null}
+                {showPrimaryName ? (
+                    <p className="truncate text-sm font-semibold text-foreground">{primaryName}</p>
+                ) : null}
                 <p className="truncate text-xs text-muted-foreground">MemeAlerts: {memealertsName}</p>
                 <p className="text-[11px] text-muted-foreground">
                     {getSourceLabel(item.source, item.type)} · {formatMemeAlertsTimestamp(item.created_at)}
                 </p>
             </div>
-            {isManual ? null : <p className="text-sm font-semibold text-emerald-300">+{formatMemeAlertsAmount(item.amount)}</p>}
+            <p className="text-sm font-semibold text-emerald-300">+{formatMemeAlertsAmount(item.amount)}</p>
         </div>
     );
 };

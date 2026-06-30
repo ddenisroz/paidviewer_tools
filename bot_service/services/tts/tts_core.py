@@ -214,6 +214,11 @@ class CreateTtsRewardRequest(BaseModel):
     cooldown: int = 0
 
 
+class AttachTtsRewardRequest(BaseModel):
+    platform: str
+    reward_id: str
+
+
 # ============================================================================
 # TTS API class used by TTS Manager.
 # ============================================================================
