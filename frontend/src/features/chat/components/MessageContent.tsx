@@ -25,6 +25,7 @@ interface MessageContentProps {
     showLinks?: boolean;
     autoLoadImages?: boolean;
     imageLoading?: 'lazy' | 'eager';
+    plainTextOnly?: boolean;
     onMediaLoad?: () => void;
 }
 
@@ -327,11 +328,17 @@ const MessageContent: React.FC<MessageContentProps> = memo(
         showLinks = true,
         autoLoadImages = true,
         imageLoading = 'lazy',
+        plainTextOnly = false,
         onMediaLoad,
     }) => {
         // Мемоизация обработки сообщения
         const content = useMemo(() => {
             if (!message) return null;
+
+            if (plainTextOnly) {
+                const processed = removeUrls(message);
+                return processed ? <span className="chat-message-content">{processed}</span> : null;
+            }
 
             // 1. Сначала обрабатываем Twitch Native Emotes (заменяем диапазоны на img)
             // Важно: делать это ПЕРЕД 7TV, так как они имеют приоритет и точные позиции
@@ -375,7 +382,17 @@ const MessageContent: React.FC<MessageContentProps> = memo(
                     ))}
                 </span>
             );
-        }, [message, channelEmotes, globalEmotes, twitchEmotes, showLinks, autoLoadImages, imageLoading, onMediaLoad]);
+        }, [
+            message,
+            channelEmotes,
+            globalEmotes,
+            twitchEmotes,
+            showLinks,
+            autoLoadImages,
+            imageLoading,
+            plainTextOnly,
+            onMediaLoad,
+        ]);
 
         return content;
     }

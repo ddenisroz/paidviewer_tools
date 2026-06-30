@@ -108,14 +108,14 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
             const baseStyle: React.CSSProperties = {
                 fontFamily: resolvedFontFamily,
                 borderRadius: `${settings?.border_radius ?? 8}px`,
-                whiteSpace: 'normal',
-                wordBreak: 'break-word',
-                overflowWrap: 'anywhere',
-                overflow: 'visible',
-                textOverflow: 'clip',
+                whiteSpace: isHorizontal ? 'nowrap' : 'normal',
+                wordBreak: isHorizontal ? 'normal' : 'break-word',
+                overflowWrap: isHorizontal ? 'normal' : 'anywhere',
+                overflow: isHorizontal ? 'hidden' : 'visible',
+                textOverflow: isHorizontal ? 'ellipsis' : 'clip',
                 flexShrink: 0,
                 minWidth: 0,
-                maxWidth: settings.chat_direction === 'horizontal' ? 'min(560px, 82vw)' : '100%',
+                maxWidth: isHorizontal ? 'min(560px, 82vw)' : '100%',
                 padding: settings.chat_direction === 'horizontal' ? '6px 10px' : '4px 8px',
                 backgroundColor: messageBackground,
                 boxShadow:
@@ -131,7 +131,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
                 gridTemplateColumns: 'max-content minmax(0, 1fr)',
                 alignItems: 'start',
                 columnGap: '6px',
-                width: settings.chat_direction === 'horizontal' ? 'max-content' : '100%',
+                width: isHorizontal ? 'max-content' : '100%',
                 minHeight: settings.chat_direction === 'horizontal' ? undefined : `${minMessageHeight}px`,
                 marginTop:
                     index > 0 && settings.chat_direction !== 'horizontal' ? `${settings?.message_spacing ?? 4}px` : '0',
@@ -311,21 +311,24 @@ const ChatMessageItem = memo<ChatMessageItemProps>(
                         color: settings.text_color,
                         minWidth: 0,
                         maxWidth: '100%',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        whiteSpace: 'normal',
+                        overflow: isHorizontal ? 'hidden' : 'visible',
+                        overflowWrap: isHorizontal ? 'normal' : 'anywhere',
+                        textOverflow: isHorizontal ? 'ellipsis' : 'clip',
+                        wordBreak: isHorizontal ? 'normal' : 'break-word',
+                        whiteSpace: isHorizontal ? 'nowrap' : 'normal',
                         alignSelf: 'start',
                     }}
                 >
                         <MessageContent
                             message={msg.message || msg.content || ''}
-                            channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
-                            globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
-                            twitchEmotes={msg.emotes}
-                            showLinks={settings?.show_links !== false}
-                            autoLoadImages={settings?.auto_load_images !== false}
+                            channelEmotes={!isHorizontal && settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
+                            globalEmotes={!isHorizontal && settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
+                            twitchEmotes={isHorizontal ? [] : msg.emotes}
+                            showLinks={!isHorizontal && settings?.show_links !== false}
+                            autoLoadImages={!isHorizontal && settings?.auto_load_images !== false}
                             imageLoading="eager"
-                            onMediaLoad={onMediaLoad}
+                            plainTextOnly={isHorizontal}
+                            onMediaLoad={isHorizontal ? undefined : onMediaLoad}
                         />
                 </span>
             </div>

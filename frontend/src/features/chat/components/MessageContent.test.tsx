@@ -24,4 +24,18 @@ describe('MessageContent', () => {
         expect(container.textContent?.trim()).toBe('https://example.com/watch?v=1');
         expect(container.innerHTML).not.toContain('\u034f');
     });
+
+    it('renders plain text only without links or images', () => {
+        const { container } = render(
+            <MessageContent
+                message={`hello :) https://example.com/pic.png world`}
+                plainTextOnly
+                twitchEmotes={[{ id: '1', name: 'Smile', start: 6, end: 7 }]}
+            />
+        );
+
+        expect(container.textContent).toBe('hello :) world');
+        expect(container.querySelector('a')).toBeNull();
+        expect(container.querySelector('img')).toBeNull();
+    });
 });
