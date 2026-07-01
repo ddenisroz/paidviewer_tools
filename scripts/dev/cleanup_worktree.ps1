@@ -1,5 +1,6 @@
 param(
-  [switch]$Apply
+  [switch]$Apply,
+  [switch]$IncludeLocalData
 )
 
 $ErrorActionPreference = 'Stop'
@@ -127,7 +128,6 @@ $fixedTargets = @(
   'bot_service\logs',
   'bot_service\temp',
   'bot_service\cache',
-  'bot_service\core\data',
   'tts_service\.pytest_cache',
   'tts_service\logs',
   'tts_service\temp',
@@ -142,6 +142,12 @@ $fixedTargets = @(
   'output',
   'artifacts'
 )
+
+if ($IncludeLocalData) {
+  $fixedTargets += @(
+    'bot_service\core\data'
+  )
+}
 
 foreach ($target in $fixedTargets) {
   Remove-RepoTarget $target
@@ -172,6 +178,7 @@ Remove-TopLevelFiles @(
 
 if (-not $Apply) {
   Write-Output 'Dry run only. Re-run with -Apply to delete these targets.'
+  Write-Output 'Local data is protected. Add -IncludeLocalData to include bot_service\core\data.'
 }
 
 Write-Output "targets=$($removed.Count)"

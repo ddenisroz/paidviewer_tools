@@ -11,6 +11,8 @@ export default defineConfig({
   plugins: [react()],
   envPrefix: [
     "VITE_APP_",
+    "VITE_API_",
+    "VITE_BOT_SERVICE_",
     "VITE_CHAT_",
     "VITE_DEFAULT_",
     "VITE_ENABLE_",

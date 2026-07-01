@@ -35,6 +35,7 @@
 ## С чего начать
 
 - [Быстрый старт и запуск всего проекта](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md)
+- [Production deployment: VPS + Vercel + Self Hosted TTS](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/DEPLOYMENT_GUIDE.md)
 - [Release checklist](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/release/RELEASE_CHECKLIST.md)
 - [Live smoke runbook](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/LIVE_SMOKE_RUNBOOK.md)
 - [Индекс активной документации](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/README.md)
@@ -71,7 +72,7 @@ cd H:\Programming\raw_code\AI\Python\paidviewer_tools
 .\scripts\dev\cleanup_worktree.ps1 -Apply
 ```
 
-Скрипт чистит только allowlist runtime-мусора: `__pycache__`, pytest/cache-директории, `frontend/dist`, временные backend-логи и runtime data. Он не удаляет `.env`, `.venv`, `node_modules`, локальные конфиги и пользовательские данные.
+Скрипт чистит только allowlist runtime-мусора: `__pycache__`, pytest/cache-директории, `frontend/dist`, временные backend-логи и temp/cache. Он не удаляет `.env`, `.venv`, `node_modules`, локальные конфиги, `uploads` и локальные данные. Для удаления `bot_service/core/data` нужен явный флаг `-IncludeLocalData`.
 
 ## Документация
 

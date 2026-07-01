@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, Optional
 
 from fastapi import Request
@@ -17,7 +18,12 @@ security_logger.setLevel(logging.INFO)
 log_dir = os.path.join(os.getcwd(), "logs", "security")
 os.makedirs(log_dir, exist_ok=True)
 
-security_handler = logging.FileHandler(os.path.join(log_dir, "security.log"), encoding="utf-8")
+security_handler = RotatingFileHandler(
+    os.path.join(log_dir, "security.log"),
+    maxBytes=int(os.getenv("SECURITY_LOG_MAX_BYTES", str(5 * 1024 * 1024))),
+    backupCount=int(os.getenv("SECURITY_LOG_BACKUP_COUNT", "5")),
+    encoding="utf-8",
+)
 security_handler.setLevel(logging.INFO)
 security_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 security_handler.setFormatter(security_formatter)
